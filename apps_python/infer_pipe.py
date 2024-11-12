@@ -160,7 +160,7 @@ class InferPipe:
             out_frame = self.post_proc(frame, result)
             if self.use_radar:
                 ##TODO: return the reformatted points, not the output frame /RG
-                out_frame, points = self.pointcloud_processor.draw_pointcloud_baseline(out_frame, list(self.pointcloud_frames))
+                out_frame = self.pointcloud_processor.draw_pointcloud_baseline(out_frame, list(self.pointcloud_frames))
 
             self.gst_pipe.push_frame(out_frame, self.gst_post_out)
             # Increment frame count
