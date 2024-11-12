@@ -89,6 +89,11 @@ def get_cmdline_args(sysv_args):
         "-d", "--dump-dot", help=help_str_dump_dot, action="store_true", default=False
     )
 
+    help_str_radar = 'Enable Radar thread that will capture pointclouds over UART -- default to /dev/ttyUSB0 and /dev/ttyUSB1 for CLI and DATA ports'
+    parser.add_argument(
+        "-r", "--radar", help=help_str_radar, action="store_true", default=False
+    )
+
     args = parser.parse_args()
     return args
 

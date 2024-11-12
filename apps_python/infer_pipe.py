@@ -34,13 +34,18 @@ import threading
 import utils
 import debug
 from post_process import PostProcess
+from pointcloud_processing import ProcessRadarPointcloud
+
+from collections import deque
+import radar.constants as radar_const
+import queue
 
 class InferPipe:
     """
     Class to abstract the threading of multiple inference pipelines
     """
 
-    def __init__(self, sub_flow, gst_pipe):
+    def __init__(self, sub_flow, gst_pipe, pointcloud_queue=None):
         """
         Constructor to create an InferPipe object.
         Args:
@@ -72,6 +77,24 @@ class InferPipe:
 
         self.pipeline_thread = threading.Thread(target=self.pipeline)
         self.stop_thread = False
+
+
+        if pointcloud_queue is not None:
+            self.use_radar = True
+            self.pointcloud_queue = pointcloud_queue
+            self.pointcloud_frames = deque(maxlen=radar_const.PERSISTENCE_FRAMES) 
+
+            cam_offset_dist = [0,  -0.025, -0.01] #default guess -- RG
+            cam_offset_angles = [0,0,0]
+            cam_offset_dist.extend(cam_offset_angles)
+            
+            self.pointcloud_processor = ProcessRadarPointcloud(sensor='imx219_1640x1232', cam_to_radar_offset=cam_offset_dist)
+        else:
+            self.use_radar = False
+            self.pointcloud_queue = None
+            self.pointcloud_frames = None
+            self.pointcloud_processor = None
+
 
     def start(self):
         """
@@ -105,6 +128,22 @@ class InferPipe:
             if self.pre_proc_debug:
                 self.pre_proc_debug.log(str(input_img.flatten()))
 
+            if self.use_radar:
+                print('pull pointcloud from queue')
+                try:
+                    pointcloud = self.pointcloud_queue.get_nowait()
+                    #swap y and z; z should be distance and y height for standard camera model
+                    pointcloud[:,[1,2]] = pointcloud[:, [2,1]]
+                    if len(self.pointcloud_frames) == radar_const.PERSISTENCE_FRAMES:
+                        self.pointcloud_frames.popleft()
+                    
+                    self.pointcloud_frames.append(pointcloud)
+
+                except queue.Empty: 
+                    print('queue empty, keep going')
+                except IndexError: 
+                    print('index error; keep going')
+
             # Inference
             start = time()
             result = self.run_time(input_img)
@@ -119,6 +158,10 @@ class InferPipe:
             if type(frame) == type(None):
                 break
             out_frame = self.post_proc(frame, result)
+            if self.use_radar:
+                ##TODO: return the reformatted points, not the output frame /RG
+                out_frame, points = self.pointcloud_processor.draw_pointcloud_baseline(out_frame, list(self.pointcloud_frames))
+
             self.gst_pipe.push_frame(out_frame, self.gst_post_out)
             # Increment frame count
             self.sub_flow.report.report_frame()

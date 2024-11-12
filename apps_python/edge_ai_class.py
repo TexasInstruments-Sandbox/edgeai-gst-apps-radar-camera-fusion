@@ -38,6 +38,10 @@ import sys
 import os
 import time
 
+import radar
+import threading, queue
+import multiprocessing as mp
+
 class EdgeAIDemo:
     """
     Abstract the functionality required for the Edge AI demo.
@@ -46,7 +50,7 @@ class EdgeAIDemo:
     """
     C7_CORE_ID_INDEX = 0
 
-    def __init__(self, config):
+    def __init__(self, config,use_radar=False):
         """
         Constructor of EdgeAIDemo class
         Args:
@@ -183,6 +187,27 @@ class EdgeAIDemo:
 
             self.flows.append(config_parser.Flow(input_obj, subflow_list, debug_config))
 
+        if use_radar:
+            print('gst apps python using a radar thread :) ')
+            cli_com_port = '/dev/ttyUSB0'
+            data_com_port = '/dev/ttyUSB1'
+
+            use_multiprocessing = True
+            if use_multiprocessing:
+                radar_queue = mp.Queue(maxsize=radar.constants.PERSISTENCE_FRAMES)
+                radar_thread = mp.Process(target=radar.radar_acquisition.run_radar, args=[radar_queue, cli_com_port, data_com_port])
+            else:
+                # use threading
+                radar_queue = queue.Queue(maxsize=radar.constants.PERSISTENCE_FRAMES)
+                radar_thread = threading.Thread(target=radar.radar_acquisition.run_radar, args=[radar_queue, cli_com_port, data_com_port])
+
+
+            self.radar_output_queue = radar_queue
+            self.radar_thread = radar_thread
+            print('radar thread ready to start....')
+            radar_thread.start()
+            print('radar thread started')
+
         self.src_pipes, self.sink_pipe = gst_wrapper.get_gst_pipe(
             self.flows, self.outputs
         )
@@ -193,7 +218,10 @@ class EdgeAIDemo:
 
         for f in self.flows:
             for s in f.sub_flows:
-                self.infer_pipes.append(InferPipe(s, self.gst_pipe))
+                #TODO add radar handle to the GST PIPE
+                pc_q = self.radar_output_queue if use_radar else None
+                self.infer_pipes.append(InferPipe(s, self.gst_pipe, pointcloud_queue=pc_q))
+
 
     def start(self):
         """

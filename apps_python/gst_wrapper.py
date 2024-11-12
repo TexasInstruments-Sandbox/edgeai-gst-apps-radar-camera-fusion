@@ -647,6 +647,10 @@ def get_input_elements(input):
                 "dcc-isp-file": "/opt/imaging/%s/linear/dcc_viss.bin" % input.sen_id,
                 "format-msb": format_msb,
             }
+            
+            if input.sen_id == 'imx219' and input.width == 1640 and input.height == 1232:
+                property['dcc-isp-file'] = "/opt/imaging/imx219/linear/dcc_viss_10b_1640x1232.bin"
+                
 
             global isp_target_idx
             if "property" in gst_element_map["isp"]:
@@ -682,6 +686,7 @@ def get_input_elements(input):
                 input.height = 1080
 
         else:
+            print('output caps from ISP/camera')
             property = {"device": input.source, "name": source_name}
             caps = "video/x-raw, width=%d, height=%d" % (input.width, input.height)
             element = make_element("v4l2src", property=property, caps=caps)
@@ -1302,9 +1307,12 @@ def get_gst_pipe(flows, outputs):
         for elem in f.input.gst_inp_elements:
             if elem.get_factory().get_name() == "tiovxisp":
                 dcc_2a_file = "/opt/imaging/%s/linear/dcc_2a.bin" % f.input.sen_id
+                if f.input.sen_id == 'imx219' and f.input.width == 1640 and f.input.height == 1232:
+                    dcc_2a_file = "/opt/imaging/imx219/linear/dcc_2a_10b_1640x1232.bin"
                 Gst.ChildProxy.set_property(elem, "sink_0::dcc-2a-file", dcc_2a_file)
                 if not f.input.format.startswith("bggi"):
                     Gst.ChildProxy.set_property(elem, "sink_0::device", f.input.subdev_id)
+                    print('set devid ' + f.input.subdev_id)
 
         # Get format of last input element after caps negotiation
         input_format = get_format(gst_player, f.input.gst_inp_elements)

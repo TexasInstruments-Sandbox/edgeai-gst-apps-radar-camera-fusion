@@ -43,7 +43,7 @@ def main(sys_argv):
         config = yaml.safe_load(f)
 
     try:
-        demo = EdgeAIDemo(config)
+        demo = EdgeAIDemo(config, use_radar=args.radar)
         demo.start()
 
         if args.verbose:
