@@ -128,7 +128,7 @@ class ProcessRadarPointcloud():
         print(f'{t2-t1} seconds to project points and draw on frame')
 
 
-        return frame, 
+        return frame 
 
 
     def project_points_from_radar_to_camera_2d(self, pointcloud, normalization_scales):
