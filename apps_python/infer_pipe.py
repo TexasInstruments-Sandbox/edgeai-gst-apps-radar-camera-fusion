@@ -129,7 +129,7 @@ class InferPipe:
                 self.pre_proc_debug.log(str(input_img.flatten()))
 
             if self.use_radar:
-                print('pull pointcloud from queue')
+                # print('pull pointcloud from queue')
                 try:
                     pointcloud = self.pointcloud_queue.get_nowait()
                     #swap y and z; z should be distance and y height for standard camera model
@@ -140,9 +140,11 @@ class InferPipe:
                     self.pointcloud_frames.append(pointcloud)
 
                 except queue.Empty: 
-                    print('queue empty, keep going')
+                    # print('queue empty, keep going')
+                    pass
                 except IndexError: 
-                    print('index error; keep going')
+                    # print('index error; keep going')
+                    pass
 
             # Inference
             start = time()
@@ -158,9 +160,10 @@ class InferPipe:
             if type(frame) == type(None):
                 break
             out_frame = self.post_proc(frame, result)
-            if self.use_radar:
-                ##TODO: return the reformatted points, not the output frame /RG
-                out_frame = self.pointcloud_processor.draw_pointcloud_baseline(out_frame, list(self.pointcloud_frames))
+            if self.use_radar and len(self.pointcloud_frames) > 0:
+                pointcloud = self.pointcloud_processor(list(self.pointcloud_frames), out_frame.shape)
+                out_frame  = self.pointcloud_processor.draw_pointcloud_baseline(out_frame, pointcloud)
+                # print(pointcloud) #N,5 array of x_pix, y_pix, z_m, range_m, and dopple_m/s for N points
 
             self.gst_pipe.push_frame(out_frame, self.gst_post_out)
             # Increment frame count

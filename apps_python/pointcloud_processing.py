@@ -81,7 +81,7 @@ class ProcessRadarPointcloud():
 
         else:
             self.intrinsic_matrix = intrinsics_matrix
-        print(self.intrinsic_matrix)
+        # print(self.intrinsic_matrix)
 
         self.cam_to_radar_offset = cam_to_radar_offset
         self.distance_offset = np.asarray(cam_to_radar_offset[0:3])
@@ -89,44 +89,55 @@ class ProcessRadarPointcloud():
 
         self.extrinsic_matrix = np.asarray(([1,0, 0, self.distance_offset[0]],[0,1,0, self.distance_offset[1]], \
             [0,0,1, self.distance_offset[2]], [0,0,0,1]))
-        print(self.extrinsic_matrix)
+        # print(self.extrinsic_matrix)
 
-    def draw_pointcloud_baseline(self, frame, pointcloud_frames):
+
+    def __call__(self, pointcloud_frames, output_frame_shape=(720,1280,3)):
+        print("Run pointcloud processing")
+        all_pointclouds = np.concatenate((pointcloud_frames), axis=0)
+        numpoints = all_pointclouds.shape[0]
+
+        print(f'{numpoints} points to process')
+        # print('first 3 preprocessed points')
+        # print(all_pointclouds[0:3,:])
+        frame_h,frame_w,_ = output_frame_shape
+
+        norm_w = frame_w / self.camera_info['width_pix']
+        norm_h = frame_h / self.camera_info['height_pix']
+        norm_scales = np.asarray([norm_w, norm_h])
+
+        pix_min = np.asarray([0,0])
+        pix_max = np.asarray([frame_w, frame_h])
+
+        distances = np.linalg.norm(all_pointclouds[:,0:3], axis=1) #take L2 norm across x,y,z for magnitude of distance
+        doppler = all_pointclouds[:,3]
+
+        projected_points = self.project_points_from_radar_to_camera_2d(copy.copy(all_pointclouds), normalization_scales=norm_scales)
+        projected_points = np.clip(projected_points, a_min=pix_min, a_max=pix_max)
+
+        pointcloud = np.zeros((numpoints, 5))
+        pointcloud[:,0:2] = projected_points
+        pointcloud[:,2] = all_pointclouds[:,2]
+        pointcloud[:,3] = distances
+        pointcloud[:,4] = doppler
+
+        # print('first 3 postprocessed points')
+        # print(pointcloud[0:3,:]) #print a few points
+
+
+        return pointcloud
+
+
+    def draw_pointcloud_baseline(self, frame, pointcloud):
         '''
         RG starter function; use as a basis point
         '''
         
         background_circle_color = (255, 255, 255)
-        print('draw PC for %d frames' % len(pointcloud_frames))
-        h,w,_ = frame.shape
-        norm_w = w / self.camera_info['width_pix']
-        norm_h = h / self.camera_info['height_pix']
-        norm_scales = np.asarray([norm_w, norm_h])
-        
-        #[x,y]
-        pix_min = np.asarray([0,0])
-        pix_max = np.asarray([frame.shape[1], frame.shape[0]])
 
-        t1 = time.time()
-
-        #TODO pass back postprocessed points. Need to collect those across frames
-
-
-        for  i, pc_frame in enumerate(pointcloud_frames):
-            if (pc_frame.shape[0] == 0): continue
-            #project pointcloud points from physical distances/location to pixels
-            projected_points = self.project_points_from_radar_to_camera_2d(copy.copy(pc_frame), normalization_scales=norm_scales)
-
-            projected_points = np.clip(projected_points, a_min=pix_min, a_max=pix_max)
-
-            for pc in projected_points:
-                #FIXME Qutaiba please ;) 
-                pass
-                # print(pc)
-                cv2.circle(frame, (int(pc[0]), int(pc[1])), 2, background_circle_color, -1)
-        t2 = time.time()
-        print(f'{t2-t1} seconds to project points and draw on frame')
-
+        for pc in pointcloud:
+            #FIXME do something more interesting with the points
+            cv2.circle(frame, (int(pc[0]), int(pc[1])), 2, background_circle_color, -1)
 
         return frame 
 
@@ -137,7 +148,6 @@ class ProcessRadarPointcloud():
         '''        
         t1 = time.time()
 
-        print('project points')
         points = pointcloud[:,:3] #N,3 <- N,7 datastructure
 
         points[:,1] *= -1 #invert y, since radar considers distance up but pixels increase downward
