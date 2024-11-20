@@ -31,7 +31,9 @@
 
 from draw_resources import ColorPalate
 import random
-class Detection:
+from norfair.tracker import TrackedObject
+from norfair.drawing.color import Palette
+class DetectedObject:
     """
     Object Detection information
     """
@@ -56,6 +58,74 @@ class Detection:
         self.d_mean = 0
         self.d_median = 0
         self.d_mode = 0
+
+class DistanceTracker:
+    """
+    Keep a list of tracked objects, associate pointcloud with objects, calcuated distance based on pointcloud
+    """
+    def __init__(self):
+        self.distance_tracker_list = dict()
+
+    def update(self, tracked_objects):
+        """
+        update list of distance object.
+        Parameters:
+            tracked_objects: list of tracked_objects.
+        """
+
+        list_id = []
+
+        #update list of distance objects, add objects if does not exist
+        
+        for obj in tracked_objects:
+            list_id.append(obj.id)
+            if obj.id in self.distance_tracker_list:
+                self.distance_tracker_list[obj.id].update_bbox(obj.estimate)
+            else:
+                self.distance_tracker_list[obj.id] = DistanceObject(obj.id, obj.estimate)
+
+        # keep only new of updated objects
+        self.distance_tracker_list = {key: self.distance_tracker_list[key] 
+            for key in self.distance_tracker_list if key in list_id}
+
+
+        def associate_pointcloud(pointcloud):
+            
+
+    # def calculate_distance(self):
+
+class DistanceObject:
+    """
+    Detected object with distance information information
+    """
+    def __init__(self, id, bbox, label=None, color=None):
+        """
+        Initialize . 
+        Parameters:
+            ...
+        """
+        # Variables
+        self.id = id
+        self.bbox = bbox
+        self.label = label
+        if label is None:
+            self.label = "People"
+        else:
+            self.label = label
+
+        if color is None:
+            self.color = random.choice(list(ColorPalate)).value
+        else:
+            self.color = color
+            
+        self.pointcloud = None
+
+        self.d_mean = 0
+        self.d_median = 0
+        self.d_mode = 0
+
+    def update_bbox(self, bbox):
+        self.bbox = bbox
 
 class DetectionBoxDraw:
     """
