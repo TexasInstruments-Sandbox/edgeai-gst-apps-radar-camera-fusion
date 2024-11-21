@@ -137,8 +137,12 @@ class PostProcessRadarCamera(PostProcess):
         tracked_objects = self.tracker.update(detections=detections)
 
         self.distance_tracker.update(tracked_objects)
-        # self.distance_tracker.associate_pointcloud(pointcloud)
-        # self.distance_tracker.calculate_distance()
+        self.distance_tracker.associate_pointcloud(pointcloud)
+        self.distance_tracker.calculate_distance()
+        self.distance_tracker.safety_check()
+        self.distance_tracker.draw_distance(img)
+        self.distance_tracker.draw_pointcloud(img)
+        self.distance_tracker.draw_safety_box(img)
 
 
 
@@ -148,12 +152,12 @@ class PostProcessRadarCamera(PostProcess):
         self.calculate_distance(detection_list)
         
         
-        for obj in detection_list:
-            # print("color ==== ", obj.color.value)
-            img = self.overlay_bounding_box(img, obj.bbox, obj.label, obj.color)
+        # for obj in detection_list:
+        #     # print("color ==== ", obj.color.value)
+        #     img = self.overlay_bounding_box(img, obj.bbox, obj.label, obj.color)
 
 
-        img = self.draw_distance(detection_list, img)
+        # img = self.draw_distance(detection_list, img)
         return img
 
     def results_to_detection_objects(self, results, image_shape):
@@ -265,25 +269,27 @@ class PostProcessRadarCamera(PostProcess):
                 # obj.d_mode = np.mode(obj.pointcloud[:,3])
                 # claculate distance based on mode of distribution
                 
-                if len(obj.pointcloud[:,3])>2:
+                # if len(obj.pointcloud[:,3])>2:
                 
-                    # Create a KDE
+                #     # Create a KDE
 
-                    try:
-                        kde = gaussian_kde(obj.pointcloud[:,3])
-                        # Generate a range of x values for plotting
-                        x = np.linspace(min(obj.pointcloud[:,3]), max(obj.pointcloud[:,3]), 100)
-                        # # Evaluate the KDE at each x value
-                        y = kde.evaluate(x)
-                        # # Find the mode
-                        mode = x[np.argmax(y)]
-                        obj.d_mode = mode
+                #     try:
+                #         kde = gaussian_kde(obj.pointcloud[:,3])
+                #         # Generate a range of x values for plotting
+                #         x = np.linspace(min(obj.pointcloud[:,3]), max(obj.pointcloud[:,3]), 100)
+                #         # # Evaluate the KDE at each x value
+                #         y = kde.evaluate(x)
+                #         # # Find the mode
+                #         mode = x[np.argmax(y)]
+                #         obj.d_mode = mode
 
-                        obj.d_mode = np.median(obj.pointcloud[:,3])
-                    except:
-                        print("pointcloud d = ", obj.pointcloud[:,3])
-                else:
-                    obj.d_mode = np.median(obj.pointcloud[:,3])
+                #         obj.d_mode = np.median(obj.pointcloud[:,3])
+                #     except:
+                #         print("pointcloud d = ", obj.pointcloud[:,3])
+                # else:
+                #     obj.d_mode = np.median(obj.pointcloud[:,3])
+
+                obj.d_mode = np.median(obj.pointcloud[:,3])
 
             else:
                 obj.d_mean =0

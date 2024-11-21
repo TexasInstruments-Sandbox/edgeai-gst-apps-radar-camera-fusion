@@ -45,3 +45,4 @@ class ColorPalate(Enum):
     PINK = [248,74,178]
     WHITE = [255,255,255]
     BLACK = [0,0,0]
+    DANGER = [231,6,6]
