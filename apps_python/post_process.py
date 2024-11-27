@@ -37,8 +37,10 @@ np.set_printoptions(threshold=np.inf, linewidth=np.inf)
 
 
 def create_title_frame(title, width, height):
+    print('create_title_frame')
     frame = np.zeros((height, width, 3), np.uint8)
-    if title != None:
+    if (title is not None) and (title != ''):
+        print('create title')
         frame = cv2.putText(
             frame,
             "Texas Instruments - Edge Analytics",

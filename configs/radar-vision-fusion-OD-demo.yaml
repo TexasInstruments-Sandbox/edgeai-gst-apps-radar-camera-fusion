@@ -1,4 +1,4 @@
-title: "Object Detection"
+title: ''
 log_level: 2
 inputs:
     input0:
@@ -14,6 +14,7 @@ inputs:
         height: 1232
         format: rggb10
         framerate: 30
+        mirror: lr
     input2:
         source: /dev/video-imx219-cam0
         subdev-id: /dev/v4l-imx219-subdev0
@@ -35,9 +36,9 @@ models:
 outputs:
     output0:
         sink: kmssink
-        width: 1920
+        width: 1920 
         height: 1080
-        overlay-perf-type: graph
+        #overlay-perf-type: graph
     output1:
         sink: /opt/edgeai-test-data/output/output_video0.mkv
         width: 1920
@@ -56,4 +57,4 @@ outputs:
         overlay-perf-type: graph
 
 flows:
-    flow0: [input1,model2,output0,[320,150,1280,720]]
+    flow0: [input1,model2,output0,[240,0,1440,1080]]

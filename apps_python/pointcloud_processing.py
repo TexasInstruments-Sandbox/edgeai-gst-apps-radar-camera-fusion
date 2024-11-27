@@ -47,7 +47,7 @@ class ProcessRadarPointcloud():
         'cam_focal_length_mm' : 2.8, #depends on lens; https://www.amazon.com/dp/B082W4ZSM9
     }
 
-    def __init__(self, sensor='imx219_1640x1232', camera_info={}, intrinsics_matrix=None, cam_to_radar_offset=[0,0,0,0,0,0]):
+    def __init__(self, sensor='imx219_1640x1232', camera_info={}, intrinsics_matrix=None, cam_to_radar_offset=[0,0,0,0,0,0], mirror=False):
         '''
         projectcameraion info must include:
             height in pixels, 
@@ -73,7 +73,7 @@ class ProcessRadarPointcloud():
 
             focal_len_pix_width = self.camera_info['cam_focal_length_mm'] / (self.camera_info['pix_width_um'] / 1000 )
             focal_len_pix_height = self.camera_info['cam_focal_length_mm'] / (self.camera_info['pix_height_um'] / 1000 )
-            center_x = self.camera_info['width_pix'] / 2
+            center_x = self.camera_info['width_pix'] / 2 #this is a best guess! intrinsic calibration with opencv is recommended
             center_y = self.camera_info['height_pix'] / 2
 
             #This will be transpose of canonical matrix format to make later calculations a bit easier
@@ -86,14 +86,17 @@ class ProcessRadarPointcloud():
         self.cam_to_radar_offset = cam_to_radar_offset
         self.distance_offset = np.asarray(cam_to_radar_offset[0:3])
         self.angle_offset = np.asarray(cam_to_radar_offset[3:])
-
+        #TODO: add rotations into the extrinsic matrix
         self.extrinsic_matrix = np.asarray(([1,0, 0, self.distance_offset[0]],[0,1,0, self.distance_offset[1]], \
             [0,0,1, self.distance_offset[2]], [0,0,0,1]))
+        self.mirror_pointcloud = mirror
+
         # print(self.extrinsic_matrix)
 
 
-    def __call__(self, pointcloud_frames, output_frame_shape=(720,1280,3)):
+    def __call__(self, pointcloud_frames, output_frame_shape=(720,1280,3), remove_out_of_bounds_points=True):
         print("Run pointcloud processing")
+        t1 = time.time()
         all_pointclouds = np.concatenate((pointcloud_frames), axis=0)
         numpoints = all_pointclouds.shape[0]
 
@@ -113,7 +116,20 @@ class ProcessRadarPointcloud():
         doppler = all_pointclouds[:,3]
 
         projected_points = self.project_points_from_radar_to_camera_2d(copy.copy(all_pointclouds), normalization_scales=norm_scales)
-        projected_points = np.clip(projected_points, a_min=pix_min, a_max=pix_max)
+
+        if self.mirror_pointcloud:
+            projected_points[:,0] = frame_w - projected_points[:,0]
+
+
+        if remove_out_of_bounds_points:
+            x_oob = (projected_points[:,0] < 0) |  (projected_points[:,0] >= frame_w)
+            y_oob = (projected_points[:,1] < 0) | (projected_points[:,1] >= frame_w)
+
+            good_points = ~(x_oob | y_oob) #NOR; unfortunately no single-op for this
+        else:
+            projected_points = np.clip(projected_points, a_min=pix_min, a_max=pix_max)
+        
+
 
         pointcloud = np.zeros((numpoints, 5))
         pointcloud[:,0:2] = projected_points
@@ -124,7 +140,11 @@ class ProcessRadarPointcloud():
         # print('first 3 postprocessed points')
         # print(pointcloud[0:3,:]) #print a few points
 
+        if remove_out_of_bounds_points:
+            pointcloud = pointcloud[good_points,:]
 
+        t2 = time.time()
+        print(t2-t1)
         return pointcloud
 
 
@@ -134,10 +154,13 @@ class ProcessRadarPointcloud():
         '''
         
         background_circle_color = (255, 255, 255)
+        offset_circle_color = (0, 0, 0)
 
         for pc in pointcloud:
             #FIXME do something more interesting with the points
-            cv2.circle(frame, (int(pc[0]), int(pc[1])), 2, background_circle_color, -1)
+            cv2.circle(frame, (int(pc[0]), int(pc[1])), 3, background_circle_color, -1)
+            cv2.circle(frame, (int(pc[0]), int(pc[1])), 2, offset_circle_color, -1)
+
 
         return frame 
 

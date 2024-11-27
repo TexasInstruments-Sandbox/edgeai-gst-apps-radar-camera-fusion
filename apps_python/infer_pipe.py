@@ -45,7 +45,7 @@ class InferPipe:
     Class to abstract the threading of multiple inference pipelines
     """
 
-    def __init__(self, sub_flow, gst_pipe, pointcloud_queue=None):
+    def __init__(self, sub_flow, gst_pipe, pointcloud_queue=None, mirror_pointcloud=False):
         """
         Constructor to create an InferPipe object.
         Args:
@@ -78,17 +78,19 @@ class InferPipe:
         self.pipeline_thread = threading.Thread(target=self.pipeline)
         self.stop_thread = False
 
+        self.mirror_pointcloud = mirror_pointcloud
 
         if pointcloud_queue is not None:
             self.use_radar = True
             self.pointcloud_queue = pointcloud_queue
             self.pointcloud_frames = deque(maxlen=radar_const.PERSISTENCE_FRAMES) 
 
-            cam_offset_dist = [0,  -0.025, -0.01] #default guess -- RG
+            #cam_offset_dist = [0,  -0.025, -0.01] #default guess -- RG
+            cam_offset_dist = [radar_const.IMX219_DEMO_OFFSET_X,  radar_const.IMX219_DEMO_OFFSET_Y, radar_const.IMX219_DEMO_OFFSET_Z] #default guess -- RG
             cam_offset_angles = [0,0,0]
             cam_offset_dist.extend(cam_offset_angles)
             
-            self.pointcloud_processor = ProcessRadarPointcloud(sensor='imx219_1640x1232', cam_to_radar_offset=cam_offset_dist)
+            self.pointcloud_processor = ProcessRadarPointcloud(sensor='imx219_1640x1232', cam_to_radar_offset=cam_offset_dist, mirror=self.mirror_pointcloud)
         else:
             self.use_radar = False
             self.pointcloud_queue = None

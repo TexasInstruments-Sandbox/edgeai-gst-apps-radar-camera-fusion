@@ -120,9 +120,9 @@ class uartParser():
                 self.cliCom.write(line.encode())
                 
             ack = self.cliCom.readline()
-            # print(ack)
+            print(ack)
             ack = self.cliCom.readline()
-            # print(ack)
+            print(ack)
             splitLine = line.split()
             if(splitLine[0] == "baudRate"): # The baudrate CLI line changes the CLI baud rate on the next cfg line to enable greater data streaming off the IWRL device.
                 try:

@@ -220,7 +220,8 @@ class EdgeAIDemo:
             for s in f.sub_flows:
                 #TODO add radar handle to the GST PIPE
                 pc_q = self.radar_output_queue if use_radar else None
-                self.infer_pipes.append(InferPipe(s, self.gst_pipe, pointcloud_queue=pc_q))
+                mirror_pointcloud = f.input.mirror == 'lr'
+                self.infer_pipes.append(InferPipe(s, self.gst_pipe, pointcloud_queue=pc_q, mirror_pointcloud=mirror_pointcloud))
 
 
     def start(self):

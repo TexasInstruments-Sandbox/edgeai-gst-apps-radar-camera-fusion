@@ -59,6 +59,11 @@ class Input:
             self.sen_id = input_config["sen-id"]
         else:
             self.sen_id = "imx219"
+        if 'mirror' in input_config:
+            self.mirror = input_config['mirror']
+        else:
+            self.mirror = None
+
         self.id = Input.count
         Input.count += 1
         self.split_count = 0
@@ -117,6 +122,11 @@ class Output:
             self.overlay_perf_type = output_config["overlay-perf-type"]
         else:
             self.overlay_perf_type = None
+        if 'mirror' in output_config:
+            self.mirror = output_config['mirror']
+        else:
+            self.mirror = None
+
         self.mosaic = False
         self.id = Output.count
         self.gst_bkgnd_sink = None

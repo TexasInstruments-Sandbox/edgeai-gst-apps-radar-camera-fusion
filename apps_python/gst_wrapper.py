@@ -791,6 +791,14 @@ def get_input_elements(input):
         element = make_element("videotestsrc", property=property, caps=caps)
         input_element_list += element
 
+
+    if input.mirror is not None:
+        property = {}
+        if input.mirror == 'lr':
+            property['method'] = 'horizontal-flip'
+        element = make_element("videoflip", property)
+        input_element_list += element
+
     return input_element_list
 
 
@@ -925,11 +933,19 @@ def get_output_elements(output):
     bg_elements = []
     mosaic_elements = []
 
+    if output.mirror != None:
+        property = {}
+        if output.mirror == 'lr':
+            property['method'] = 'horizontal-flip'
+        sink_elements += make_element("videoflip", property)
+
     if output.overlay_perf_type != None:
         sink_elements += make_element("queue")
         property = {"title":output.title,
                     "overlay-type":output.overlay_perf_type}
         sink_elements += make_element("tiperfoverlay",property=property)
+
+
 
     sink_ext = os.path.splitext(output.sink)[1]
     status = 0
@@ -1313,6 +1329,8 @@ def get_gst_pipe(flows, outputs):
                 if not f.input.format.startswith("bggi"):
                     Gst.ChildProxy.set_property(elem, "sink_0::device", f.input.subdev_id)
                     print('set devid ' + f.input.subdev_id)
+
+
 
         # Get format of last input element after caps negotiation
         input_format = get_format(gst_player, f.input.gst_inp_elements)
