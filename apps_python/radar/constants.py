@@ -66,6 +66,5 @@ DOPPLER_EXPECTED_RANGE = DOPPLER_EXPECTED_MAX - DOPPLER_EXPECTED_MIN
 PERSISTENCE_FRAMES = 1
 
 IMX219_DEMO_OFFSET_X = 0.000 # distance camera is to the right of radar
-IMX219_DEMO_OFFSET_Y = -0.018 # distance camera is above radar
-IMX219_DEMO_OFFSET_Z = 0.001 # distance camera is in front of radar
-3
+IMX219_DEMO_OFFSET_Y = 0.018 # distance camera is above radar
+IMX219_DEMO_OFFSET_Z = 0.001 # distance camera is in behind of radar. 

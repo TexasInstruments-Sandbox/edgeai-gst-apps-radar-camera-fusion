@@ -34,6 +34,7 @@ import time, copy
 import cv2
 import numpy as np
 import copy
+import math
 import debug
 import radar
 
@@ -83,15 +84,64 @@ class ProcessRadarPointcloud():
             self.intrinsic_matrix = intrinsics_matrix
         # print(self.intrinsic_matrix)
 
-        self.cam_to_radar_offset = cam_to_radar_offset
-        self.distance_offset = np.asarray(cam_to_radar_offset[0:3])
-        self.angle_offset = np.asarray(cam_to_radar_offset[3:])
-        #TODO: add rotations into the extrinsic matrix
-        self.extrinsic_matrix = np.asarray(([1,0, 0, self.distance_offset[0]],[0,1,0, self.distance_offset[1]], \
-            [0,0,1, self.distance_offset[2]], [0,0,0,1]))
+        self.extrinsic_matrix = self.build_extrinsic_matrix(cam_to_radar_offset)
         self.mirror_pointcloud = mirror
 
         # print(self.extrinsic_matrix)
+
+    def build_extrinsic_matrix(self, cam_to_radar_offset):
+        '''
+        :param cam_to_radar_offset: [x,y,z, alpha, beta, gamma]. First 3 are distances in meters, last 3 are angles in radians
+
+        x: distance radar is to the right (+) or left (-)of the camera
+        y: distance radar is above (+) or below (-) the camera
+        z: distance radar is to the in front of (+) or behind (-)
+        alpha(pitch): angle along x axis (left-right, parallel to plane of camera/image sensor). Positive is tilted up, negative tilted down w.r.t. camera
+        beta(yaw): angle along y axis (up-down), parallel to plan eof camera/image sensor). Positive is tilted toward  the left, negative is tilted toward the right
+        gamma(roll): angle along the z (distance) axis. positive is CCW about the principal ray, negative is CW
+
+        Angles are for the radar w.r.t. to the camera. If radar is tilted in postive direction for an axis, then value should be positive. 
+        Note that the pitch roll and yaw (and the axes they correspond to) is subject to intepretation by different conventions. 
+        There are also multiple possible orderings for applying these angular rotations that results in the final rotation matrix used within the extrinsic matrix
+
+        Refs: http://www.euclideanspace.com/maths/algebra/matrix/orthogonal/rotation/index.htm
+        '''
+        print('build extrinsic matrix')
+        translation = np.asarray([cam_to_radar_offset[0:3]])
+        translation[0,2] = translation[0,2] * -1 #FIXME; decide is 3rd value (z) should be negative or not, bc applying rotations requires Z inverted for Right hand rule
+        translation[0,1] = translation[0,1] * -1 #FIXME; decide is 2nd value (y) should be negative or not, bc applying pixels increase downward
+
+        rotation_angles = cam_to_radar_offset[-3:]
+        alpha, beta, gamma = rotation_angles
+
+        # about X axis, pitch, alpha
+        rotation_pitch = np.asarray([ [1, 0, 0],   
+            [0, math.cos(alpha), -math.sin(alpha)],   
+            [0, math.sin(alpha), math.cos(alpha)]]   
+            )
+        #about Y axis, yaw, beta
+        rotation_yaw = np.asarray([ [math.cos(beta), 0, math.sin(beta)],   
+            [0, 1, 0],   
+            [-math.sin(beta), 0, math.cos(beta)]]  
+            )
+        #about Z axis, roll, gamma
+        rotation_roll = np.asarray([ [math.cos(gamma), -math.sin(gamma), 0],   
+            [math.sin(gamma), math.cos(gamma), 0],   
+            [0, 0, 1]]   
+            )
+
+        print(rotation_yaw)
+        print(rotation_pitch)
+        print(rotation_roll)
+
+        # ordering matters! typical is to do heading (yaw), attitude (pitch), then bank (roll)
+        # We will do pointclouds as row vectors, so need to do R * PC_vector = PC_vector * R_yaw * R_pitch * R_roll 
+        rotation = np.matmul(rotation_yaw, np.matmul(rotation_pitch, rotation_roll))
+
+        self.extrinsic_matrix = np.append(rotation, translation, axis=0)
+        print(self.extrinsic_matrix) #should be 4,3q
+        return self.extrinsic_matrix
+
 
 
     def __call__(self, pointcloud_frames, output_frame_shape=(720,1280,3), remove_out_of_bounds_points=True):
@@ -99,12 +149,9 @@ class ProcessRadarPointcloud():
         t1 = time.time()
         all_pointclouds = np.concatenate((pointcloud_frames), axis=0)
         numpoints = all_pointclouds.shape[0]
+        pointcloud = np.zeros((numpoints, 5))
 
-        print(f'{numpoints} points to process')
-        # print('first 3 preprocessed points')
-        # print(all_pointclouds[0:3,:])
         frame_h,frame_w,_ = output_frame_shape
-
         norm_w = frame_w / self.camera_info['width_pix']
         norm_h = frame_h / self.camera_info['height_pix']
         norm_scales = np.asarray([norm_w, norm_h])
@@ -112,45 +159,47 @@ class ProcessRadarPointcloud():
         pix_min = np.asarray([0,0])
         pix_max = np.asarray([frame_w, frame_h])
 
-        distances = np.linalg.norm(all_pointclouds[:,0:3], axis=1) #take L2 norm across x,y,z for magnitude of distance
-        doppler = all_pointclouds[:,3]
+        print(f'{numpoints} points to process')
+        # print('first 3 preprocessed points')
+        # print(all_pointclouds[0:3,:])
+        if numpoints > 0:
 
-        projected_points = self.project_points_from_radar_to_camera_2d(copy.copy(all_pointclouds), normalization_scales=norm_scales)
+            distances = np.linalg.norm(all_pointclouds[:,0:3], axis=1) #take L2 norm across x,y,z for magnitude of distance
+            doppler = all_pointclouds[:,3]
 
-        if self.mirror_pointcloud:
-            projected_points[:,0] = frame_w - projected_points[:,0]
+            projected_points = self.project_points_from_radar_to_camera_2d(copy.copy(all_pointclouds), normalization_scales=norm_scales)
+
+            if self.mirror_pointcloud:
+                projected_points[:,0] = frame_w - projected_points[:,0]
 
 
-        if remove_out_of_bounds_points:
-            x_oob = (projected_points[:,0] < 0) |  (projected_points[:,0] >= frame_w)
-            y_oob = (projected_points[:,1] < 0) | (projected_points[:,1] >= frame_w)
+            if remove_out_of_bounds_points:
+                x_oob = (projected_points[:,0] < 0) |  (projected_points[:,0] >= frame_w)
+                y_oob = (projected_points[:,1] < 0) | (projected_points[:,1] >= frame_w)
 
-            good_points = ~(x_oob | y_oob) #NOR; unfortunately no single-op for this
-        else:
-            projected_points = np.clip(projected_points, a_min=pix_min, a_max=pix_max)
+                good_points = ~(x_oob | y_oob) #NOR; unfortunately no single-op for this
+            else:
+                projected_points = np.clip(projected_points, a_min=pix_min, a_max=pix_max)
         
+            pointcloud[:,0:2] = projected_points
+            pointcloud[:,2] = all_pointclouds[:,2]
+            pointcloud[:,3] = distances
+            pointcloud[:,4] = doppler
 
+            # print('first 3 postprocessed points')
+            # print(pointcloud[0:3,:]) #print a few points
 
-        pointcloud = np.zeros((numpoints, 5))
-        pointcloud[:,0:2] = projected_points
-        pointcloud[:,2] = all_pointclouds[:,2]
-        pointcloud[:,3] = distances
-        pointcloud[:,4] = doppler
+            if remove_out_of_bounds_points:
+                pointcloud = pointcloud[good_points,:]
 
-        # print('first 3 postprocessed points')
-        # print(pointcloud[0:3,:]) #print a few points
-
-        if remove_out_of_bounds_points:
-            pointcloud = pointcloud[good_points,:]
-
-        t2 = time.time()
-        print(t2-t1)
+            t2 = time.time()
+            print(t2-t1)
         return pointcloud
 
 
     def draw_pointcloud_baseline(self, frame, pointcloud):
         '''
-        RG starter function; use as a basis point
+        starter function; use as a basis point
         '''
         
         background_circle_color = (255, 255, 255)
@@ -158,8 +207,8 @@ class ProcessRadarPointcloud():
 
         for pc in pointcloud:
             #FIXME do something more interesting with the points
-            cv2.circle(frame, (int(pc[0]), int(pc[1])), 3, background_circle_color, -1)
-            cv2.circle(frame, (int(pc[0]), int(pc[1])), 2, offset_circle_color, -1)
+            cv2.circle(frame, (int(pc[0]), int(pc[1])), 4, background_circle_color, -1)
+            cv2.circle(frame, (int(pc[0]), int(pc[1])), 3, offset_circle_color, -1)
 
 
         return frame 
@@ -168,19 +217,36 @@ class ProcessRadarPointcloud():
     def project_points_from_radar_to_camera_2d(self, pointcloud, normalization_scales):
         '''
         https://docs.opencv.org/3.4/d9/d0c/group__calib3d.html
-        '''        
+        Unlike CV doc above, we'll be representing points as rows to work better with structure of pointcloud input
+           This convention is important when considering the extrinsic matrix
+
+        Point_camera = Point_world * Extrinsic * intrinsic = [u,v,s], where 'u' and 'v' are pixel locations that must be renormalized by psuedo-distance 's'
+            where 'world' is the radar's reference point
+        '''
         t1 = time.time()
 
-        points = pointcloud[:,:3] #N,3 <- N,7 datastructure
+        world_points = pointcloud[:,:3] #N,3 <- N,7 datastructure
+        # print('original points from radar')
+        # print(world_points)
+        world_points[:,2] *= -1 #invert z in world coordinates to end up right-hand-rule compliant coordinate system
 
-        points[:,1] *= -1 #invert y, since radar considers distance up but pixels increase downward
+        world_points = np.append(world_points, np.ones( (world_points.shape[0],1) ), axis=1) #add ones so translation portion of extrinsic is applied
+        print('converted world points to RHR system')
+        print(world_points)
 
-        # projected_points = np.matmul(self.intrinsic_matrix,  points.T)
-        #transposed version 
-        projected_points = np.matmul(points, self.intrinsic_matrix)
+
+        camera_coord_points = np.matmul(world_points, self.extrinsic_matrix)
+        camera_coord_points[:,1:3] *= -1 #undo inversion on the Z axis, and invert Y axis since pixels increase 'downward'
+
+        print('Camera coord system points, after inversions (y,z)')
+        print(camera_coord_points)
+
+        projected_points = np.matmul(camera_coord_points, self.intrinsic_matrix)
         # projected_points = projected_points[0:2,:] / projected_points[2,:] # normalize by psuedo distance scale
-        projected_points = np.divide(projected_points[:,0:2], projected_points[:,2][:,np.newaxis]) # normalize by psuedo distance scale
-        
+        projected_points = np.divide(projected_points[:,0:2], projected_points[:,2][:,np.newaxis]) # normalize by psuedo distance scale 's'
+        # print('projected points (original image size)')
+        # print(projected_points)
+
         #normalize to the frame we'll be visualizing
         projected_points *= normalization_scales
         t2 = time.time()
