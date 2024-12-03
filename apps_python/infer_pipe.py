@@ -161,12 +161,15 @@ class InferPipe:
             frame = self.gst_pipe.pull_frame(self.gst_sen_inp, self.sub_flow.input.loop)
             if type(frame) == type(None):
                 break
-            out_frame = self.post_proc(frame, result)
+            # out_frame = self.post_proc(frame, result, pointcloud)
             if self.use_radar and len(self.pointcloud_frames) > 0:
+                out_frame = self.post_proc(frame, result, pointcloud)
                 pointcloud = self.pointcloud_processor(list(self.pointcloud_frames), out_frame.shape)
                 out_frame  = self.pointcloud_processor.draw_pointcloud_baseline(out_frame, pointcloud)
                 # print(pointcloud) #N,5 array of x_pix, y_pix, z_m, range_m, and dopple_m/s for N points
-
+            else:
+                out_frame = frame
+                
             self.gst_pipe.push_frame(out_frame, self.gst_post_out)
             # Increment frame count
             self.sub_flow.report.report_frame()

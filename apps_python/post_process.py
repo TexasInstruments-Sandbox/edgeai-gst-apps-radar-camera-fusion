@@ -32,6 +32,10 @@ import cv2
 import numpy as np
 import copy
 import debug
+from scipy.stats import gaussian_kde
+from detection_meta import DetectedObject, DistanceObject, DistanceTracker
+from norfair import Detection, Tracker
+from typing import List , Optional, Union
 
 np.set_printoptions(threshold=np.inf, linewidth=np.inf)
 
@@ -91,11 +95,373 @@ class PostProcess:
         if flow.model.task_type == "classification":
             return PostProcessClassification(flow)
         elif flow.model.task_type == "detection":
-            return PostProcessDetection(flow)
+            # return PostProcessDetection(flow)
+            return PostProcessRadarCamera(flow)
         elif flow.model.task_type == "segmentation":
             return PostProcessSegmentation(flow)
         elif flow.model.task_type == "keypoint_detection":
             return PostProcessKeypointDetection(flow)
+
+class PostProcessRadarCamera(PostProcess):
+    def __init__(self, flow):
+        super().__init__(flow)
+
+        # CONSTANTS
+        # Tracker constants
+        DISTANCE_THRESHOLD_BBOX: float = 1
+        DISTANCE_FUNCTION = "iou"
+        INITIALIZATION_DELAY = 4
+        HIT_COUNTER_MAX = 5
+
+        # initilize tracker 
+        self.tracker = Tracker(initialization_delay=INITIALIZATION_DELAY,
+        distance_function=DISTANCE_FUNCTION,
+        distance_threshold=DISTANCE_THRESHOLD_BBOX,
+        hit_counter_max=HIT_COUNTER_MAX
+        )
+
+        # initilized distance tracker
+        self.distance_tracker = DistanceTracker()
+
+    def __call__(self, img, results, pointcloud):
+        """
+        Post process function for radar+camera fusion
+        Args:
+            img: Input frame
+            results: output of inference
+            
+        """
+
+        
+        
+        detection_list = self.results_to_detection_objects(results, img.shape)
+        detections = self.yolo_detections_to_norfair_detections(results, img.shape)
+        tracked_objects = self.tracker.update(detections=detections)
+
+        self.distance_tracker.update(tracked_objects)
+        self.distance_tracker.associate_pointcloud(pointcloud)
+        self.distance_tracker.calculate_distance()
+        self.distance_tracker.safety_check()
+        self.distance_tracker.draw_distance(img)
+        self.distance_tracker.draw_pointcloud(img)
+        self.distance_tracker.draw_safety_box(img)
+
+
+
+
+
+        self.associate_pointcloud(detection_list, pointcloud)
+        self.calculate_distance(detection_list)
+        
+        
+        # for obj in detection_list:
+        #     # print("color ==== ", obj.color.value)
+        #     img = self.overlay_bounding_box(img, obj.bbox, obj.label, obj.color)
+
+
+        # img = self.draw_distance(detection_list, img)
+        return img
+
+    def results_to_detection_objects(self, results, image_shape):
+        """ 
+        Process the results output from the model.
+
+        Args:
+            results: output of inference
+            image_shape: shape of the output frame.
+            
+        """
+        for i, r in enumerate(results):
+            r = np.squeeze(r)
+            if r.ndim == 1:
+                r = np.expand_dims(r, 1)
+            results[i] = r
+
+        if self.model.shuffle_indices:
+            results_reordered = []
+            for i in self.model.shuffle_indices:
+                results_reordered.append(results[i])
+            results = results_reordered
+
+        if results[-1].ndim < 2:
+            results = results[:-1]
+
+        bbox = np.concatenate(results, axis=-1)
+
+        if self.model.formatter:
+            if self.model.ignore_index == None:
+                bbox_copy = copy.deepcopy(bbox)
+            else:
+                bbox_copy = copy.deepcopy(np.delete(bbox, self.model.ignore_index, 1))
+            bbox[..., self.model.formatter["dst_indices"]] = bbox_copy[
+                ..., self.model.formatter["src_indices"]
+            ]
+
+        if not self.model.normalized_detections:
+            bbox[..., (0, 2)] /= self.model.resize[0]
+            bbox[..., (1, 3)] /= self.model.resize[1]
+
+        bbox[..., (0, 2)] *= image_shape[1]
+        bbox[..., (1, 3)] *= image_shape[0]
+
+
+        object_detection_list = []
+
+        for b in bbox:
+            if b[5] > self.model.viz_threshold and int(b[4]) == 0:
+                if type(self.model.label_offset) == dict:
+                    class_name_idx = self.model.label_offset[int(b[4])]
+                else:
+                    class_name_idx = self.model.label_offset + int(b[4])
+
+                if class_name_idx in self.model.dataset_info:
+                    class_name = self.model.dataset_info[class_name_idx].name
+                    if not class_name:
+                        class_name = "UNDEFINED"
+                    if self.model.dataset_info[class_name_idx].supercategory:
+                        class_name = (
+                            self.model.dataset_info[class_name_idx].supercategory
+                            + "/"
+                            + class_name
+                        )
+                    color = self.model.dataset_info[class_name_idx].rgb_color
+                    box = np.array(
+                        [
+                            [b[0].item(), b[1].item()],
+                            [b[2].item(), b[3].item()],
+                        ]
+                    )
+                    object_detection_list.append(DetectedObject(box, b[5], b[4], class_name, color)) 
+                else:
+                    class_name = "UNDEFINED"
+                    color = (20, 220, 20)
+
+        return object_detection_list
+        
+    def associate_pointcloud(self, detection_list, pointcloud):
+        """
+        Associate point cloud with the detected objects based on the overlap between point cloud and bounding box
+        Args:
+            detection_list : list of the detected objects 
+            pointcloud: array of point cloud from the radar
+        """
+
+        for obj in detection_list:
+            # obj.pointcloud = [
+            #     [pt for pt in pointcloud if pt[0]>obj.bbox[0,0] and pt[0]<obj.bbox[1,0] and pt[1]>obj.bbox[0,1] and pt[1]<obj.bbox[1,1]]
+            #         for pt in pointcloud
+            # ]
+
+            x_mask = np.logical_and(pointcloud[:,0] > obj.bbox[0,0], pointcloud[:,0] < obj.bbox[1,0])
+            y_mask = np.logical_and(pointcloud[:,1] > obj.bbox[0,1], pointcloud[:,1] < obj.bbox[1,1])
+
+            obj.pointcloud = pointcloud[x_mask & y_mask]
+
+    def calculate_distance(self, detection_list):
+        """
+        Cacluate the distance of an object based on the associated pointcloud
+        Args:
+            detection_list : list of the detected objects 
+        """
+        for obj in detection_list:
+            
+            if len(obj.pointcloud) > 0:
+                obj.d_mean = np.mean(obj.pointcloud[:,3])
+                obj.d_median = np.median(obj.pointcloud[:,3])
+                # obj.d_mode = np.mode(obj.pointcloud[:,3])
+                # claculate distance based on mode of distribution
+                
+                # if len(obj.pointcloud[:,3])>2:
+                
+                #     # Create a KDE
+
+                #     try:
+                #         kde = gaussian_kde(obj.pointcloud[:,3])
+                #         # Generate a range of x values for plotting
+                #         x = np.linspace(min(obj.pointcloud[:,3]), max(obj.pointcloud[:,3]), 100)
+                #         # # Evaluate the KDE at each x value
+                #         y = kde.evaluate(x)
+                #         # # Find the mode
+                #         mode = x[np.argmax(y)]
+                #         obj.d_mode = mode
+
+                #         obj.d_mode = np.median(obj.pointcloud[:,3])
+                #     except:
+                #         print("pointcloud d = ", obj.pointcloud[:,3])
+                # else:
+                #     obj.d_mode = np.median(obj.pointcloud[:,3])
+
+                obj.d_mode = np.median(obj.pointcloud[:,3])
+
+            else:
+                obj.d_mean =0
+                obj.d_median =0
+                obj.d_mode =0
+
+    def draw_distance(self, detection_list, frame):
+        """
+        draw distance of object
+        Args:
+            detection_list : list of the detected objects 
+            frame (numpy array): a three dimensional array representing the frame (image).
+            text_size:
+            text_thickness:
+        Returns:
+            numpy array: a three dimensional array of the frame with timeing data.
+        """
+        text_size = 1.5
+        text_thickness = 3
+        text_color = (0,0,0)
+        # text_color = Palette.choose_color(key)
+        for obj in detection_list:
+            # text = "D: Mean:{:.2f}".format(obj.d_mean)
+            # print("distance m = ", obj.d_mean)
+            text = "D_mean:{:.2f} D_med:{:.2f} D_mod:{:.2f}".format(obj.d_mean, obj.d_median, obj.d_median)
+
+            box = obj.bbox
+
+            coordinates = np.mean(np.array(box), axis=0)
+
+            (text_w, text_h),_ = cv2.getTextSize(str(text), cv2.FONT_HERSHEY_SIMPLEX, text_size, text_thickness)
+
+            coordinates[0] = int(coordinates[0] - text_w/2)
+
+            _,frame_width,_ = frame.shape
+
+            coordinates[0] = min(frame_width-text_w,coordinates[0])
+
+            coordinates[0] = max(0,coordinates[0])
+
+            coordinates[1] = int(box[0,1])
+
+            # cv2.putText(
+            # frame,
+            # text,
+            # (coordinates.astype(int)),
+            # cv2.FONT_HERSHEY_SIMPLEX,
+            # text_size,
+            # text_color,
+            # text_thickness
+            # )
+
+
+            for i, line in enumerate(text.split(' ')):
+
+                (text_w, text_h),_ = cv2.getTextSize(line, cv2.FONT_HERSHEY_DUPLEX, text_size, text_thickness)
+                x = int(coordinates[0])
+                y = int((i+1)*(text_h+5) + 10) + int(coordinates[1])
+                cv2.putText(frame, line,(x,y) , cv2.FONT_HERSHEY_DUPLEX, text_size, text_color, text_thickness)
+
+
+        return frame
+
+    def yolo_detections_to_norfair_detections(self, results, image_shape) -> List[Detection]:
+        """convert detections_as_xywh to norfair detections"""
+        norfair_detections: List[Detection] = []
+
+        for i, r in enumerate(results):
+            r = np.squeeze(r)
+            if r.ndim == 1:
+                r = np.expand_dims(r, 1)
+            results[i] = r
+
+        if self.model.shuffle_indices:
+            results_reordered = []
+            for i in self.model.shuffle_indices:
+                results_reordered.append(results[i])
+            results = results_reordered
+
+        if results[-1].ndim < 2:
+            results = results[:-1]
+
+        bbox = np.concatenate(results, axis=-1)
+
+        if self.model.formatter:
+            if self.model.ignore_index == None:
+                bbox_copy = copy.deepcopy(bbox)
+            else:
+                bbox_copy = copy.deepcopy(np.delete(bbox, self.model.ignore_index, 1))
+            bbox[..., self.model.formatter["dst_indices"]] = bbox_copy[
+                ..., self.model.formatter["src_indices"]
+            ]
+
+        ####################################################################
+        # OBJECT TRACKING 
+        ####################################################################
+        if not self.model.normalized_detections:
+            bbox[..., (0, 2)] /= self.model.resize[0]
+            bbox[..., (1, 3)] /= self.model.resize[1]
+        
+        bbox[..., (0, 2)] *= image_shape[1]
+        bbox[..., (1, 3)] *= image_shape[0]
+        
+        for b in bbox:
+            if b[5] > self.model.viz_threshold and int(b[4]) == 0:
+                box = np.array(
+                    [
+                        [b[0].item(), b[1].item()],
+                        [b[2].item(), b[3].item()],
+                    ]
+                )
+                scores = np.array(
+                    [b[5], b[5]]
+                )
+                norfair_detections.append(
+                    Detection(
+                        points=box, scores=scores, label=int(b[4])
+                    )
+                )
+        return norfair_detections
+
+    def overlay_bounding_box(self, frame, bbox, class_name, color):
+        """
+        draw bounding box at given co-ordinates.
+
+        Args:
+            frame (numpy array): Input image where the overlay should be drawn
+            bbox : Bounding box co-ordinates in format [X1 Y1 X2 Y2]
+            class_name : Name of the class to overlay
+        """
+        box = [
+            int(bbox[0,0]),
+            int(bbox[0,1]),
+            int(bbox[1,0]),
+            int(bbox[1,1]),
+        ]
+        
+        # print("color ==== ", color)
+        # print("box ==== ", box)
+        box_color = color
+        luma = ((66*(color[0])+129*(color[1])+25*(color[2])+128)>>8)+16
+        if(luma >= 128):
+            text_color = (0, 0, 0)
+        else:
+            text_color = (255, 255, 255)
+
+        cv2.rectangle(frame, (box[0], box[1]), (box[2], box[3]), box_color, 2)
+        cv2.rectangle(
+            frame,
+            (int((box[2] + box[0]) / 2) - 5, int((box[3] + box[1]) / 2) + 5),
+            (int((box[2] + box[0]) / 2) + 160, int((box[3] + box[1]) / 2) - 15),
+            box_color,
+            -1,
+        )
+        cv2.putText(
+            frame,
+            class_name,
+            (int((box[2] + box[0]) / 2), int((box[3] + box[1]) / 2)),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.5,
+            text_color,
+        )
+
+        if self.debug:
+            self.debug_str += class_name
+            self.debug_str += str(box) + "\n"
+
+        return frame
+
+    # def tracked_to_distance_objects(self, tracked_list):
 
 
 class PostProcessClassification(PostProcess):
