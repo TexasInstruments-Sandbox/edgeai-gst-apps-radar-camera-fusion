@@ -163,10 +163,15 @@ class InferPipe:
                 break
             # out_frame = self.post_proc(frame, result, pointcloud)
             if self.use_radar and len(self.pointcloud_frames) > 0:
-                out_frame = self.post_proc(frame, result, pointcloud)
+                t1 = time()
                 pointcloud = self.pointcloud_processor(list(self.pointcloud_frames), out_frame.shape)
+
+                out_frame = self.post_proc(frame, result, pointcloud)
+
                 out_frame  = self.pointcloud_processor.draw_pointcloud_baseline(out_frame, pointcloud)
                 # print(pointcloud) #N,5 array of x_pix, y_pix, z_m, range_m, and dopple_m/s for N points
+                t2 = time()
+                print(f'Pointcloud processing took {t2-t1} s')
             else:
                 out_frame = frame
                 

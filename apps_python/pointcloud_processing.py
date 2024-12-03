@@ -160,7 +160,6 @@ class ProcessRadarPointcloud():
         pix_min = np.asarray([0,0])
         pix_max = np.asarray([frame_w, frame_h])
 
-        print(f'{numpoints} points to process')
         # print('first 3 preprocessed points')
         # print(all_pointclouds[0:3,:])
         if numpoints > 0:
@@ -194,7 +193,6 @@ class ProcessRadarPointcloud():
                 pointcloud = pointcloud[good_points,:]
 
             t2 = time.time()
-            print(t2-t1)
         return pointcloud
 
 
@@ -232,15 +230,15 @@ class ProcessRadarPointcloud():
         world_points[:,2] *= -1 #invert z in world coordinates to end up right-hand-rule compliant coordinate system
 
         world_points = np.append(world_points, np.ones( (world_points.shape[0],1) ), axis=1) #add ones so translation portion of extrinsic is applied
-        print('converted world points to RHR system')
-        print(world_points)
+        # print('converted world points to RHR system')
+        # print(world_points)
 
 
         camera_coord_points = np.matmul(world_points, self.extrinsic_matrix)
         camera_coord_points[:,1:3] *= -1 #undo inversion on the Z axis, and invert Y axis since pixels increase 'downward'
 
-        print('Camera coord system points, after inversions (y,z)')
-        print(camera_coord_points)
+        # print('Camera coord system points, after inversions (y,z)')
+        # print(camera_coord_points)
 
         projected_points = np.matmul(camera_coord_points, self.intrinsic_matrix)
         # projected_points = projected_points[0:2,:] / projected_points[2,:] # normalize by psuedo distance scale
@@ -251,7 +249,6 @@ class ProcessRadarPointcloud():
         #normalize to the frame we'll be visualizing
         projected_points *= normalization_scales
         t2 = time.time()
-
         # exit()
 
         return projected_points

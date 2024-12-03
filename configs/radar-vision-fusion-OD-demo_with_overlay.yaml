@@ -1,4 +1,4 @@
-title: 'IWR6843 + AM62A'
+title: 'NA'
 log_level: 2
 inputs:
     input0:
@@ -38,7 +38,7 @@ outputs:
         sink: kmssink
         width: 1920 
         height: 1080
-        #overlay-perf-type: graph
+        overlay-perf-type: graph
     output1:
         sink: /opt/edgeai-test-data/output/output_video0.mkv
         width: 1920
@@ -57,4 +57,4 @@ outputs:
         overlay-perf-type: graph
 
 flows:
-    flow0: [input1,model2,output0,[240,100,1440,980]]
+    flow0: [input1,model2,output0,[240,0,1440,1080]]

@@ -36,6 +36,7 @@ from scipy.stats import gaussian_kde
 from radar_camera_fusion import RadarCameraFusion
 from norfair import Detection, Tracker
 from typing import List , Optional, Union
+from draw_resources import ColorPalate
 
 np.set_printoptions(threshold=np.inf, linewidth=np.inf)
 
@@ -47,7 +48,7 @@ def create_title_frame(title, width, height):
         print('create title')
         frame = cv2.putText(
             frame,
-            "Texas Instruments - Edge Analytics",
+            "Radar + Camera Fusion",
             (40, 30),
             cv2.FONT_HERSHEY_SIMPLEX,
             1.2,
@@ -55,23 +56,23 @@ def create_title_frame(title, width, height):
             2,
         )
         frame = cv2.putText(
-            frame, title, (40, 70), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2
+            frame, title, (40, 70), cv2.FONT_HERSHEY_SIMPLEX, 1, ColorPalate.GREEN.value, 2
         )
     return frame
 
 
 def overlay_model_name(frame, model_name, start_x, start_y, width, height):
-    row_size = 40 * width // 1280
-    font_size = width / 1280
-    cv2.putText(
-        frame,
-        "Model : " + model_name,
-        (start_x + 5, start_y - row_size // 4),
-        cv2.FONT_HERSHEY_SIMPLEX,
-        font_size,
-        (255, 255, 255),
-        2,
-    )
+    # row_size = 40 * width // 1280
+    # font_size = width / 1280
+    # cv2.putText(
+    #     frame,
+    #     "Model : " + model_name,
+    #     (start_x + 5, start_y - row_size // 4),
+    #     cv2.FONT_HERSHEY_SIMPLEX,
+    #     font_size,
+    #     (255, 255, 255),
+    #     2,
+    # )
     return frame
 
 

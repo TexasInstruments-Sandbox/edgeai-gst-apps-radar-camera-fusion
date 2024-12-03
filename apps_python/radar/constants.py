@@ -66,14 +66,15 @@ DOPPLER_EXPECTED_RANGE = DOPPLER_EXPECTED_MAX - DOPPLER_EXPECTED_MIN
 import math
 PERSISTENCE_FRAMES = 1
 
+#extrinsic calibration values. Think of these are moving from the Radar POV into camera POV. X points to the right, Y points up, and Z points back INTO the radar/camera (Z must be this way to allow right-hand-rule relationships)
 #distances in meters
 IMX219_DEMO_OFFSET_X = 0.000 # distance camera is to the right of radar
 IMX219_DEMO_OFFSET_Y = 0.018 # distance camera is above radar
 IMX219_DEMO_OFFSET_Z = 0.001 # distance camera is in behind of radar. 
-#angles in radians; all follow right-hand-rule axes
+#angles in radians; all follow right-hand-rule axes, where Z points into the front of the radar/camera along the principal ray
 IMX219_DEMO_ANGLE_RADIANS_YAW = 0 * math.pi/180 # angle about Y axis (right,left). Positive is radar turn right w.r.t. camera plane/lens
 IMX219_DEMO_ANGLE_RADIANS_PITCH = 0 * math.pi/180 #angle about X axis (up,down). Positive is radar angled down w.r.t. camera plane/lens
-IMX219_DEMO_ANGLE_RADIANS_ROLL = 0 * math.pi/180 #ange about Z axis (clockwise, counter-clockwise). Positive is radar turned clockwise w.r.t. camera plane/lens
+IMX219_DEMO_ANGLE_RADIANS_ROLL = 0 * math.pi/180 #angle about Z axis (clockwise, counter-clockwise). Positive is radar turned counter clockwise w.r.t. camera plane/lens, looking in the direction of principal ray. If looking head-on at radar-camera, flip this angle  (your POV is then opposite principal ray)
 
 IMX219_DEMO_LENS_DISTORTION_K2 = 0 #TODO
 IMX219_DEMO_LENS_DISTORTION_K4 = 0 #TODO
