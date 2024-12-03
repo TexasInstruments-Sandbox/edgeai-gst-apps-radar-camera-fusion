@@ -87,7 +87,7 @@ class InferPipe:
 
             #cam_offset_dist = [0,  -0.025, -0.01] #default guess -- RG
             cam_offset_dist = [radar_const.IMX219_DEMO_OFFSET_X,  radar_const.IMX219_DEMO_OFFSET_Y, radar_const.IMX219_DEMO_OFFSET_Z] #default guess -- RG
-            cam_offset_angles = [0,0,0]
+            cam_offset_angles = [radar_const.IMX219_DEMO_ANGLE_RADIANS_PITCH,radar_const.IMX219_DEMO_ANGLE_RADIANS_YAW, radar_const.IMX219_DEMO_ANGLE_RADIANS_ROLL] # pitch, yaw, roll
             cam_offset_dist.extend(cam_offset_angles)
             
             self.pointcloud_processor = ProcessRadarPointcloud(sensor='imx219_1640x1232', cam_to_radar_offset=cam_offset_dist, mirror=self.mirror_pointcloud)

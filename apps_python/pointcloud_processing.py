@@ -105,6 +105,7 @@ class ProcessRadarPointcloud():
         There are also multiple possible orderings for applying these angular rotations that results in the final rotation matrix used within the extrinsic matrix
 
         Refs: http://www.euclideanspace.com/maths/algebra/matrix/orthogonal/rotation/index.htm
+           Seems to show rotations based on column vectors, so matrices are generated in transpose to apply for row-vectors
         '''
         print('build extrinsic matrix')
         translation = np.asarray([cam_to_radar_offset[0:3]])
@@ -116,23 +117,23 @@ class ProcessRadarPointcloud():
 
         # about X axis, pitch, alpha
         rotation_pitch = np.asarray([ [1, 0, 0],   
-            [0, math.cos(alpha), -math.sin(alpha)],   
-            [0, math.sin(alpha), math.cos(alpha)]]   
+            [0, math.cos(alpha), math.sin(alpha)],   
+            [0, -math.sin(alpha), math.cos(alpha)]]   
             )
         #about Y axis, yaw, beta
-        rotation_yaw = np.asarray([ [math.cos(beta), 0, math.sin(beta)],   
+        rotation_yaw = np.asarray([ [math.cos(beta), 0, -math.sin(beta)],   
             [0, 1, 0],   
-            [-math.sin(beta), 0, math.cos(beta)]]  
+            [math.sin(beta), 0, math.cos(beta)]]  
             )
         #about Z axis, roll, gamma
-        rotation_roll = np.asarray([ [math.cos(gamma), -math.sin(gamma), 0],   
-            [math.sin(gamma), math.cos(gamma), 0],   
+        rotation_roll = np.asarray([ [math.cos(gamma), math.sin(gamma), 0],   
+            [-math.sin(gamma), math.cos(gamma), 0],   
             [0, 0, 1]]   
             )
 
-        print(rotation_yaw)
-        print(rotation_pitch)
-        print(rotation_roll)
+        # print(rotation_yaw)
+        # print(rotation_pitch)
+        # print(rotation_roll)
 
         # ordering matters! typical is to do heading (yaw), attitude (pitch), then bank (roll)
         # We will do pointclouds as row vectors, so need to do R * PC_vector = PC_vector * R_yaw * R_pitch * R_roll 

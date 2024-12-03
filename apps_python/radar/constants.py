@@ -63,8 +63,18 @@ DOPPLER_EXPECTED_RANGE = DOPPLER_EXPECTED_MAX - DOPPLER_EXPECTED_MIN
 
 
 ## Application level constants
+import math
 PERSISTENCE_FRAMES = 1
 
+#distances in meters
 IMX219_DEMO_OFFSET_X = 0.000 # distance camera is to the right of radar
 IMX219_DEMO_OFFSET_Y = 0.018 # distance camera is above radar
 IMX219_DEMO_OFFSET_Z = 0.001 # distance camera is in behind of radar. 
+#angles in radians; all follow right-hand-rule axes
+IMX219_DEMO_ANGLE_RADIANS_YAW = 0 * math.pi/180 # angle about Y axis (right,left). Positive is radar turn right w.r.t. camera plane/lens
+IMX219_DEMO_ANGLE_RADIANS_PITCH = 0 * math.pi/180 #angle about X axis (up,down). Positive is radar angled down w.r.t. camera plane/lens
+IMX219_DEMO_ANGLE_RADIANS_ROLL = 0 * math.pi/180 #ange about Z axis (clockwise, counter-clockwise). Positive is radar turned clockwise w.r.t. camera plane/lens
+
+IMX219_DEMO_LENS_DISTORTION_K2 = 0 #TODO
+IMX219_DEMO_LENS_DISTORTION_K4 = 0 #TODO
+IMX219_DEMO_LENS_DISTORTION_K6 = 0 #TODO
