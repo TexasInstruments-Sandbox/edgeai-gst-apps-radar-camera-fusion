@@ -932,6 +932,7 @@ def get_output_elements(output):
     sink_elements = []
     bg_elements = []
     mosaic_elements = []
+    
 
     if output.mirror != None:
         property = {}
@@ -941,7 +942,8 @@ def get_output_elements(output):
 
     if output.overlay_perf_type != None:
         sink_elements += make_element("queue")
-        property = {"title":output.title,
+        property = {"main-title": "Radar + Camera Fusion",
+                    "title": "IWR6843 + AM62A", #"title":output.title,
                     "overlay-type":output.overlay_perf_type}
         sink_elements += make_element("tiperfoverlay",property=property)
 
