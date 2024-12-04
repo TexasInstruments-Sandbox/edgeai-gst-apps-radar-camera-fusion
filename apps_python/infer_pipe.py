@@ -34,7 +34,7 @@ import threading
 import utils
 import debug
 from post_process import PostProcess
-from pointcloud_processing import ProcessRadarPointcloud
+from pointcloud_projection import RadarPointcloudProjector
 
 from collections import deque
 import radar.constants as radar_const
@@ -90,7 +90,7 @@ class InferPipe:
             cam_offset_angles = [radar_const.IMX219_DEMO_ANGLE_RADIANS_PITCH,radar_const.IMX219_DEMO_ANGLE_RADIANS_YAW, radar_const.IMX219_DEMO_ANGLE_RADIANS_ROLL] # pitch, yaw, roll
             cam_offset_dist.extend(cam_offset_angles)
             
-            self.pointcloud_processor = ProcessRadarPointcloud(sensor='imx219_1640x1232', cam_to_radar_offset=cam_offset_dist, mirror=self.mirror_pointcloud)
+            self.pointcloud_processor = RadarPointcloudProjector(sensor='imx219_1640x1232', cam_to_radar_offset=cam_offset_dist, mirror=self.mirror_pointcloud)
         else:
             self.use_radar = False
             self.pointcloud_queue = None
@@ -168,10 +168,10 @@ class InferPipe:
 
                 out_frame = self.post_proc(frame, result, pointcloud)
 
-                out_frame  = self.pointcloud_processor.draw_pointcloud_baseline(out_frame, pointcloud)
-                # print(pointcloud) #N,5 array of x_pix, y_pix, z_m, range_m, and dopple_m/s for N points
+                # out_frame  = self.pointcloud_processor.draw_pointcloud_baseline(out_frame, pointcloud)
                 t2 = time()
-                print(f'Pointcloud processing took {t2-t1} s')
+
+                # print(f'Pointcloud processing + visualization took {t2-t1} s')
             else:
                 out_frame = frame
                 

@@ -46,7 +46,7 @@ from draw_resources import ColorPalate
 # Functional parameters
 MAX_WORKING_DISTANCE_LIMIT = 4      # The maximum considered distance for pointcloud, if negative no limit [Meter]
 MIN_WORKING_DISTANCE_LIMIT = -1     # The minimum considered distance for pointcloud, if negative no limit [Meter]
-RESTRICTED_DISTANCE = 1             # Distance of the restriceted area. If smaller objects changes color to red [Meter]
+RESTRICTED_DISTANCE = 1.5             # Distance of the restriceted area. If smaller objects changes color to red [Meter]
 MIN_POINTS_FOR_DISTANCE = 4         # Minimum number of points to be considered to calculate distance      
 DISTANCE_PERCENT_THRESHOLD = 0.1    # Percentage of acceptable change in distance. If change is bigger, it has to stay for a number of DISTANCE_COUNT_THRESHOLD
 DISTANCE_COUNT_THRESHOLD = 5        # Number of times (frames) the big change of distance has to be sustained before actaul distance is changed.
@@ -184,7 +184,7 @@ class RadarCameraFusion:
         """
         Check if the object is outside of restricted area based on their distance.
         """
-        for key in self.distance_tracker_list:
+        for key in self.distance_tracker_list:                
             if self.distance_tracker_list[key].d_median is not None and self.distance_tracker_list[key].d_median < RESTRICTED_DISTANCE:
                 self.distance_tracker_list[key].is_restrict = True
             else:

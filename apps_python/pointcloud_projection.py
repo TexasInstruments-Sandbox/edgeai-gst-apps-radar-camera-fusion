@@ -37,8 +37,9 @@ import copy
 import math
 import debug
 import radar
+from radar import constants as radar_const
 
-class ProcessRadarPointcloud():
+class RadarPointcloudProjector():
     
     imx219_1640x1232_camera_info = {
         'height_pix': 1232,
@@ -68,7 +69,7 @@ class ProcessRadarPointcloud():
             We will assume angles are all 0 for simplicity
         '''
         if sensor == 'imx219_1640x1232':
-            self.camera_info = ProcessRadarPointcloud.imx219_1640x1232_camera_info
+            self.camera_info = RadarPointcloudProjector.imx219_1640x1232_camera_info
 
         if intrinsics_matrix is None:
 
@@ -146,22 +147,20 @@ class ProcessRadarPointcloud():
 
 
     def __call__(self, pointcloud_frames, output_frame_shape=(720,1280,3), remove_out_of_bounds_points=True):
-        print("Run pointcloud processing")
-        t1 = time.time()
+
         all_pointclouds = np.concatenate((pointcloud_frames), axis=0)
         numpoints = all_pointclouds.shape[0]
+
+        print("Run pointcloud processing for %d points" % numpoints)
+        t1 = time.time()
         pointcloud = np.zeros((numpoints, 5))
 
         frame_h,frame_w,_ = output_frame_shape
-        norm_w = frame_w / self.camera_info['width_pix']
-        norm_h = frame_h / self.camera_info['height_pix']
-        norm_scales = np.asarray([norm_w, norm_h])
+        norm_scales = np.asarray([frame_w / self.camera_info['width_pix'], frame_w / self.camera_info['height_pix']])
 
         pix_min = np.asarray([0,0])
         pix_max = np.asarray([frame_w, frame_h])
 
-        # print('first 3 preprocessed points')
-        # print(all_pointclouds[0:3,:])
         if numpoints > 0:
 
             distances = np.linalg.norm(all_pointclouds[:,0:3], axis=1) #take L2 norm across x,y,z for magnitude of distance
@@ -195,6 +194,40 @@ class ProcessRadarPointcloud():
             t2 = time.time()
         return pointcloud
 
+    def distort_pointcloud_projections(self, projected_points, k_coeff=radar_const.IMX219_LENS_RADIAL_DISTORTION, p_coeff=radar_const.IMX219_LENS_TANGENTIAL_DISTORTION, s_coeff=radar_const.IMX219_LENS_THIN_PRISM_DISTORTION, fudge_factors=[radar_const.IMX219_DEMO_FUDGE_FACTOR_X, radar_const.IMX219_DEMO_FUDGE_FACTOR_Y]) : 
+        '''
+        https://learnopencv.com/understanding-lens-distortion/
+        '''
+        distorted_points = np.zeros(projected_points.shape)
+        r = np.linalg.norm(projected_points[:,0:2], axis=1)
+        
+        x = projected_points[:,0]
+        y = projected_points[:,1]
+        r2 = np.power(r, 2)
+        r4 = np.power(r2, 2)
+        r6 = np.power(r2, 3)
+
+        k1, k2, k3, k4, k5, k6 = k_coeff
+        p1, p2 = p_coeff
+        s1, s2, s3, s4 = s_coeff
+
+        radial_distortion = (1 + k1*r2 + k2*r4 + k3*r6) / (1 + k4*r2 + k5*r4 + k6*r6)
+
+        tangential_distortion_x = 2*p1*x*y + p2*(r2+2*np.power(x, 2))
+        tangential_distortion_y = 2*p2*x*y + p1*(r2+2*np.power(y, 2)) 
+
+        thin_prism_x = s1 * r2 + s2 * r4
+        thin_prism_y = s3 * r2 + s4 * r4
+
+        fudge_factor_x = x * fudge_factors[0]
+        fudge_factor_y = y * fudge_factors[1]
+
+        distorted_points[:,0] = x * radial_distortion + tangential_distortion_x + thin_prism_x + fudge_factor_x
+        distorted_points[:,1] = y * radial_distortion + tangential_distortion_y + thin_prism_y + fudge_factor_y
+
+        
+        return distorted_points 
+
 
     def draw_pointcloud_baseline(self, frame, pointcloud):
         '''
@@ -205,15 +238,17 @@ class ProcessRadarPointcloud():
         offset_circle_color = (0, 0, 0)
 
         for pc in pointcloud:
-            #FIXME do something more interesting with the points
-            cv2.circle(frame, (int(pc[0]), int(pc[1])), 4, background_circle_color, -1)
-            cv2.circle(frame, (int(pc[0]), int(pc[1])), 3, offset_circle_color, -1)
+            size = 10/pc[2]
+            size = int(max(min(size,15),2))
+
+            cv2.circle(frame, (int(pc[0]), int(pc[1])), size, background_circle_color, -1)
+            cv2.circle(frame, (int(pc[0]), int(pc[1])), size-1, offset_circle_color, -1)
 
 
         return frame 
 
 
-    def project_points_from_radar_to_camera_2d(self, pointcloud, normalization_scales):
+    def project_points_from_radar_to_camera_2d(self, pointcloud, normalization_scales=[1,1]):
         '''
         https://docs.opencv.org/3.4/d9/d0c/group__calib3d.html
         Unlike CV doc above, we'll be representing points as rows to work better with structure of pointcloud input
@@ -222,7 +257,6 @@ class ProcessRadarPointcloud():
         Point_camera = Point_world * Extrinsic * intrinsic = [u,v,s], where 'u' and 'v' are pixel locations that must be renormalized by psuedo-distance 's'
             where 'world' is the radar's reference point
         '''
-        t1 = time.time()
 
         world_points = pointcloud[:,:3] #N,3 <- N,7 datastructure
         # print('original points from radar')
@@ -237,18 +271,18 @@ class ProcessRadarPointcloud():
         camera_coord_points = np.matmul(world_points, self.extrinsic_matrix)
         camera_coord_points[:,1:3] *= -1 #undo inversion on the Z axis, and invert Y axis since pixels increase 'downward'
 
-        # print('Camera coord system points, after inversions (y,z)')
-        # print(camera_coord_points)
+        normalized_points = np.divide(camera_coord_points[:,0:2], camera_coord_points[:,2][:,np.newaxis]) # normalize by psuedo distance scale 's'
 
-        projected_points = np.matmul(camera_coord_points, self.intrinsic_matrix)
-        # projected_points = projected_points[0:2,:] / projected_points[2,:] # normalize by psuedo distance scale
-        projected_points = np.divide(projected_points[:,0:2], projected_points[:,2][:,np.newaxis]) # normalize by psuedo distance scale 's'
-        # print('projected points (original image size)')
-        # print(projected_points)
+        #distortion
+        distorted_points = np.ones(camera_coord_points.shape)
+        distorted_points[:,0:2] = self.distort_pointcloud_projections(normalized_points)
+
+
+        projected_points = np.matmul(distorted_points, self.intrinsic_matrix)
+        projected_points = projected_points[:,:2]
 
         #normalize to the frame we'll be visualizing
         projected_points *= normalization_scales
-        t2 = time.time()
-        # exit()
+
 
         return projected_points
