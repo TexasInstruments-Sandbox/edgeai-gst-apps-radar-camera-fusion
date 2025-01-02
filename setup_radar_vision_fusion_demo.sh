@@ -50,8 +50,5 @@ else
   fi
 fi
 
-# install norfair
-pip3 install norfair
-
-# install scipy
-pip3 install scipy
+# install python dependencies
+pip3 install -r requirements.txt
