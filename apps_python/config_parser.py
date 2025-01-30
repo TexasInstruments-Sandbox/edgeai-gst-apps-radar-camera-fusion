@@ -191,15 +191,15 @@ class Output:
 
         disp_id = len(self.subflows)
         self.subflows.append(subflow)
-        if self.mosaic:
-            self.title_frame = overlay_model_name(
-                self.title_frame,
-                subflow.model.model_name,
-                subflow.x_pos,
-                subflow.y_pos,
-                subflow.width,
-                subflow.height,
-            )
+        # if self.mosaic:   # Remove to avoid writing model name and simplify interface
+        #     self.title_frame = overlay_model_name(
+        #         self.title_frame,
+        #         subflow.model.model_name,
+        #         subflow.x_pos,
+        #         subflow.y_pos,
+        #         subflow.width,
+        #         subflow.height,
+        #     )
         if float(Fraction(fps)) > float(Fraction(self.fps)):
             self.fps = fps
         return disp_id

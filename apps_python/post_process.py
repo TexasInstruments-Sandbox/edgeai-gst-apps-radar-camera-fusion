@@ -48,7 +48,7 @@ def create_title_frame(title, width, height):
         print('create title')
         frame = cv2.putText(
             frame,
-            "Radar + Camera Fusion",
+            "Radar + Camera Fusion", #override
             (40, 30),
             cv2.FONT_HERSHEY_SIMPLEX,
             1.2,
@@ -62,17 +62,17 @@ def create_title_frame(title, width, height):
 
 
 def overlay_model_name(frame, model_name, start_x, start_y, width, height):
-    # row_size = 40 * width // 1280
-    # font_size = width / 1280
-    # cv2.putText(
-    #     frame,
-    #     "Model : " + model_name,
-    #     (start_x + 5, start_y - row_size // 4),
-    #     cv2.FONT_HERSHEY_SIMPLEX,
-    #     font_size,
-    #     (255, 255, 255),
-    #     2,
-    # )
+    row_size = 40 * width // 1280
+    font_size = width / 1280
+    cv2.putText(
+        frame,
+        "Model : " + model_name,
+        (start_x + 5, start_y - row_size // 4),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        font_size,
+        (255, 255, 255),
+        2,
+    )
     return frame
 
 

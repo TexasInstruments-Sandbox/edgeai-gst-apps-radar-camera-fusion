@@ -1,4 +1,4 @@
-title: 'NA'
+title: 'NA' #used to remove Title for simpler UI
 log_level: 2
 inputs:
     input0:
@@ -14,7 +14,7 @@ inputs:
         height: 1232
         format: rggb10
         framerate: 30
-        mirror: lr
+        mirror: lr #Added option to mirror images left-right
     input2:
         source: /dev/video-imx219-cam0
         subdev-id: /dev/v4l-imx219-subdev0
