@@ -155,6 +155,7 @@ class RadarCameraFusion:
     def distance_multimodal(self):
         """
         Use multimodal statistics to calculate distance. 
+        FIXME: delete function or correct missing 'key' variable /RG
         """
         try:
             kde = gaussian_kde(self.distance_tracker_list[key].pointcloud[:,3])

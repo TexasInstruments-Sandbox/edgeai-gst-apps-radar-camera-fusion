@@ -43,7 +43,7 @@ def main(sys_argv):
         config = yaml.safe_load(f)
 
     try:
-        demo = EdgeAIDemo(config, use_radar=args.radar)
+        demo = EdgeAIDemo(config, use_radar=args.radar, track_distance=(not args.calibrate_radar))
         demo.start()
 
         if args.verbose:

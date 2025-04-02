@@ -116,17 +116,17 @@ class RadarPointcloudProjector():
 
         # about X axis, pitch, alpha
         rotation_pitch = np.asarray([ [1, 0, 0],   
-            [0, math.cos(alpha), math.sin(alpha)],   
-            [0, -math.sin(alpha), math.cos(alpha)]]   
+            [0, math.cos(alpha), -math.sin(alpha)],   
+            [0, math.sin(alpha), math.cos(alpha)]]   
             )
         #about Y axis, yaw, beta
-        rotation_yaw = np.asarray([ [math.cos(beta), 0, -math.sin(beta)],   
+        rotation_yaw = np.asarray([ [math.cos(beta), 0, math.sin(beta)],   
             [0, 1, 0],   
-            [math.sin(beta), 0, math.cos(beta)]]  
+            [-math.sin(beta), 0, math.cos(beta)]]  
             )
         #about Z axis, roll, gamma
-        rotation_roll = np.asarray([ [math.cos(gamma), math.sin(gamma), 0],   
-            [-math.sin(gamma), math.cos(gamma), 0],   
+        rotation_roll = np.asarray([ [math.cos(gamma), -math.sin(gamma), 0],   
+            [math.sin(gamma), math.cos(gamma), 0],   
             [0, 0, 1]]   
             )
 
@@ -175,6 +175,7 @@ class RadarPointcloudProjector():
                 y_oob = (projected_points[:,1] < 0) | (projected_points[:,1] >= frame_w)
 
                 good_points = ~(x_oob | y_oob) #NOR; unfortunately no single-op for thisin python
+                print(sum(good_points))
             else:
                 projected_points = np.clip(projected_points, a_min=pix_min, a_max=pix_max)
         
@@ -258,15 +259,13 @@ class RadarPointcloudProjector():
         '''
 
         world_points = pointcloud[:,:3] #N,3 <- N,7 datastructure
-        # print('original points from radar')
-        # print(world_points)
-        world_points[:,2] *= -1 #invert z in world coordinates to end up right-hand-rule compliant coordinate system
+        world_points[:,1] *= -1 #invert y in world coordinates to end up right-hand-rule compliant coordinate system. 
+        # Will also orient Y such that down is increasing in value, consistent with display convention (UPPER left is origin (0,0))
 
         world_points = np.append(world_points, np.ones( (world_points.shape[0],1) ), axis=1) #add ones so translation portion of extrinsic is applied
 
 
         camera_coord_points = np.matmul(world_points, self.extrinsic_matrix)
-        camera_coord_points[:,1:3] *= -1 #undo inversion on the Z axis, and invert Y axis since pixels increase 'downward'
 
         normalized_points = np.divide(camera_coord_points[:,0:2], camera_coord_points[:,2][:,np.newaxis]) # normalize by psuedo distance scale 's'
 

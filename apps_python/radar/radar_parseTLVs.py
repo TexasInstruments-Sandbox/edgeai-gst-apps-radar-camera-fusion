@@ -38,8 +38,9 @@ import math
 import os
 import datetime
 
+from .radar_constants import *
 '''
-Based on Industrial Visualizer fro Radar Toolbox
+Based on Industrial Visualizer from Radar Toolbox, with some modification
 '''
 
 # ================================================== Common Helper Functions ==================================================

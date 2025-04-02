@@ -181,6 +181,7 @@ class uartParser():
 
 def main():
     cfg_file = './IWR6843AOP-configs/baseline-AOP-people-detection.cfg'
+    print(f'Testing radar data acqusition; send config "{cfg_file}" then print pointclouds ')
     cfg = open(cfg_file, 'r').readlines()
     radar = uartParser()
     radar.connectComPorts('/dev/ttyUSB0', '/dev/ttyUSB1')
@@ -204,8 +205,6 @@ def run_radar(output_queue:queue.Queue, cli_com_port='/dev/ttyUSB0', data_com_po
     while True:
         print('next radar frame')
         radar_dict = radar.readAndParseUartDoubleCOMPort()
-        # print(radar_dict.get('pointCloud'))
-        # time.sleep(1)
         try:
             output_queue.put_nowait(radar_dict['pointCloud'])
         except queue.Full:

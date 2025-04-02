@@ -46,7 +46,7 @@ class InferPipe:
     Class to abstract the threading of multiple inference pipelines
     """
 
-    def __init__(self, sub_flow, gst_pipe, pointcloud_queue=None, mirror_pointcloud=False):
+    def __init__(self, sub_flow, gst_pipe, pointcloud_queue=None, mirror_pointcloud=False, track_distance=True):
         """
         Constructor to create an InferPipe object.
         Args:
@@ -58,7 +58,7 @@ class InferPipe:
         self.gst_pre_inp = gst_pipe.get_src(sub_flow.gst_pre_src_name, sub_flow.flow.id)
         self.gst_sen_inp = gst_pipe.get_src(sub_flow.gst_sen_src_name, sub_flow.flow.id)
         self.run_time = sub_flow.model.run_time
-        self.post_proc = PostProcess.get(sub_flow)
+        self.post_proc = PostProcess.get(sub_flow, track_distance)
 
         self.gst_post_out = gst_pipe.get_sink(
             sub_flow.gst_post_sink_name,
@@ -92,6 +92,7 @@ class InferPipe:
             cam_offset_dist.extend(cam_offset_angles)
             
             self.pointcloud_processor = RadarPointcloudProjector(sensor='imx219_1640x1232', cam_to_radar_offset=cam_offset_dist, mirror=self.mirror_pointcloud)
+            self.track_distance = track_distance
         else:
             self.use_radar = False
             self.pointcloud_queue = None
@@ -167,7 +168,7 @@ class InferPipe:
                 t1 = time()
                 pointcloud = self.pointcloud_processor(list(self.pointcloud_frames), out_frame.shape)
 
-                out_frame = self.post_proc(frame, result, pointcloud)
+                out_frame = self.post_proc(frame, result, pointcloud, self.track_distance)
 
                 # out_frame  = self.pointcloud_processor.draw_pointcloud_baseline(out_frame, pointcloud)
                 t2 = time()

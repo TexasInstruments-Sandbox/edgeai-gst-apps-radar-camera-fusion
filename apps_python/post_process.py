@@ -37,6 +37,7 @@ from radar_camera_fusion import RadarCameraFusion
 from norfair import Detection, Tracker
 from typing import List , Optional, Union
 from draw_resources import ColorPalate
+import pointcloud_projection
 
 np.set_printoptions(threshold=np.inf, linewidth=np.inf)
 
@@ -89,7 +90,7 @@ class PostProcess:
         if flow.debug_config and flow.debug_config.post_proc:
             self.debug = debug.Debug(flow.debug_config, "post")
 
-    def get(flow):
+    def get(flow, track_distance=True):
         """
         Create a object of a subclass based on the task type
         """
@@ -97,14 +98,14 @@ class PostProcess:
             return PostProcessClassification(flow)
         elif flow.model.task_type == "detection":
             # return PostProcessDetection(flow)
-            return PostProcessRadarCamera(flow)
+            return PostProcessRadarCamera(flow, track_distance)
         elif flow.model.task_type == "segmentation":
             return PostProcessSegmentation(flow)
         elif flow.model.task_type == "keypoint_detection":
             return PostProcessKeypointDetection(flow)
 
 class PostProcessRadarCamera(PostProcess):
-    def __init__(self, flow):
+    def __init__(self, flow, track_distance=True):
         super().__init__(flow)
 
         # CONSTANTS
@@ -114,15 +115,18 @@ class PostProcessRadarCamera(PostProcess):
         INITIALIZATION_DELAY = 4
         HIT_COUNTER_MAX = 5
 
+        self.track_distance = track_distance
         # initilize tracker 
-        self.tracker = Tracker(initialization_delay=INITIALIZATION_DELAY,
-        distance_function=DISTANCE_FUNCTION,
-        distance_threshold=DISTANCE_THRESHOLD_BBOX,
-        hit_counter_max=HIT_COUNTER_MAX
-        )
+        if track_distance:
+            self.tracker = Tracker(initialization_delay=INITIALIZATION_DELAY,
+            distance_function=DISTANCE_FUNCTION,
+            distance_threshold=DISTANCE_THRESHOLD_BBOX,
+            hit_counter_max=HIT_COUNTER_MAX
+            )
 
-        # initilized distance tracker
-        self.distance_tracker = RadarCameraFusion()
+            # initilized distance tracker
+            self.distance_tracker = RadarCameraFusion()
+
 
     def __call__(self, img, results, pointcloud):
         """
@@ -132,18 +136,21 @@ class PostProcessRadarCamera(PostProcess):
             results: output of inference
             
         """
-        # detection_list = self.results_to_detection_objects(results, img.shape)
-        detections = self.yolo_detections_to_norfair_detections(results, img.shape)
-        tracked_objects = self.tracker.update(detections=detections)
+        if self.track_distance:
+            # detection_list = self.results_to_detection_objects(results, img.shape)
+            detections = self.yolo_detections_to_norfair_detections(results, img.shape)
+            tracked_objects = self.tracker.update(detections=detections)
 
-        self.distance_tracker.update(tracked_objects)
-        self.distance_tracker.associate_pointcloud(pointcloud)
-        self.distance_tracker.calculate_distance()
-        self.distance_tracker.safety_check()
-        
-        self.distance_tracker.draw_pointcloud(img)
-        self.distance_tracker.draw_bounding_box(img)
-        self.distance_tracker.draw_distance(img)
+            self.distance_tracker.update(tracked_objects)
+            self.distance_tracker.associate_pointcloud(pointcloud)
+            self.distance_tracker.calculate_distance()
+            self.distance_tracker.safety_check()
+            
+            self.distance_tracker.draw_pointcloud(img)
+            self.distance_tracker.draw_bounding_box(img)
+            self.distance_tracker.draw_distance(img)
+        else: 
+            img = pointcloud_projection.draw_pointcloud_baseline(img, pointcloud)
 
         return img
 

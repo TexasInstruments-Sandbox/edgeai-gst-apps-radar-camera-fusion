@@ -52,7 +52,7 @@ class EdgeAIDemo:
     """
     C7_CORE_ID_INDEX = 0
 
-    def __init__(self, config,use_radar=False):
+    def __init__(self, config, use_radar=False, track_distance=True):
         """
         Constructor of EdgeAIDemo class
         Args:
@@ -190,7 +190,7 @@ class EdgeAIDemo:
             self.flows.append(config_parser.Flow(input_obj, subflow_list, debug_config))
 
         if use_radar:
-            print('gst apps python using a radar thread :) ')
+            print('gst apps python using a radar thread for capturing data')
             cli_com_port = '/dev/ttyUSB0'
             data_com_port = '/dev/ttyUSB1'
 
@@ -223,7 +223,7 @@ class EdgeAIDemo:
                 #TODO add radar handle to the GST PIPE
                 pc_q = self.radar_output_queue if use_radar else None
                 mirror_pointcloud = f.input.mirror == 'lr'
-                self.infer_pipes.append(InferPipe(s, self.gst_pipe, pointcloud_queue=pc_q, mirror_pointcloud=mirror_pointcloud))
+                self.infer_pipes.append(InferPipe(s, self.gst_pipe, pointcloud_queue=pc_q, mirror_pointcloud=mirror_pointcloud, track_distance=track_distance))
 
 
     def start(self):

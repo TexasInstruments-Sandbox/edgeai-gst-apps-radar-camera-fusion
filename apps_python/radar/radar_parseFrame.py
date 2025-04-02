@@ -116,14 +116,11 @@ def parseStandardFrame(frameData):
             outputDict['procTimeData'], outputDict['powerData'], outputDict['tempData'] \
             = parseExtStatsTLV(frameData[:tlvLength], tlvLength)
         elif (tlvType == MMWAVE_OUTPUT_EXT_MSG_DETECTED_POINTS):
-            # print("Found type for MMWAVE_OUTPUT_EXT_MSG_DETECTED_POINTS")
             pass
         
         elif (tlvType == MMWAVE_OUTPUT_MSG_COMPRESSED_POINTS):
-            # print("Found type for MMWAVE_OUTPUT_MSG_COMPRESSED_POINTS")
             parseCompressedSphericalPointCloudTLV(frameData[:tlvLength], tlvLength, outputDict['pointCloud'])
         else:
-            # print ("Warning: unhandled TLV type: %d" % (tlvType))
             pass
 
         # Move to next TLV
