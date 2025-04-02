@@ -42,7 +42,7 @@ import datetime
 
 # Local File Imports
 from .radar_parseTLVs import *
-from .constants import *
+from .radar_constants import *
 
 '''
 Based on Industrial Visualizer fro Radar Toolbox

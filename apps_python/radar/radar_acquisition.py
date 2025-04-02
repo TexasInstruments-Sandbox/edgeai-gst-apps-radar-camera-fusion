@@ -35,7 +35,7 @@ import struct
 import queue
 
 from .radar_parseFrame import parseStandardFrame
-from .constants import *
+from .radar_constants import *
 
 '''
 Based on Industrial Visualizer fro Radar Toolbox

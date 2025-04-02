@@ -39,6 +39,8 @@ import os
 import time
 
 import radar
+import camera_constants
+
 import threading, queue
 import multiprocessing as mp
 
@@ -194,11 +196,11 @@ class EdgeAIDemo:
 
             use_multiprocessing = True
             if use_multiprocessing:
-                radar_queue = mp.Queue(maxsize=radar.constants.PERSISTENCE_FRAMES)
+                radar_queue = mp.Queue(maxsize=camera_constants.PERSISTENCE_FRAMES)
                 radar_thread = mp.Process(target=radar.radar_acquisition.run_radar, args=[radar_queue, cli_com_port, data_com_port])
             else:
                 # use threading
-                radar_queue = queue.Queue(maxsize=radar.constants.PERSISTENCE_FRAMES)
+                radar_queue = queue.Queue(maxsize=camera_constants.PERSISTENCE_FRAMES)
                 radar_thread = threading.Thread(target=radar.radar_acquisition.run_radar, args=[radar_queue, cli_com_port, data_com_port])
 
 

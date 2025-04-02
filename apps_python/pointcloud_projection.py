@@ -36,9 +36,8 @@ import cv2
 import numpy as np
 import copy
 import math
-import debug
-import radar
-from radar import constants as radar_const
+from radar import radar_constants as radar_const
+import camera_constants
 
 class RadarPointcloudProjector():
     
@@ -111,8 +110,6 @@ class RadarPointcloudProjector():
         '''
         print('build extrinsic matrix')
         translation = np.asarray([cam_to_radar_offset[0:3]])
-        translation[0,2] = translation[0,2] * -1 #FIXME; decide is 3rd value (z) should be negative or not, bc applying rotations requires Z inverted for Right hand rule
-        translation[0,1] = translation[0,1] * -1 #FIXME; decide is 2nd value (y) should be negative or not, bc applying pixels increase downward
 
         rotation_angles = cam_to_radar_offset[-3:]
         alpha, beta, gamma = rotation_angles
@@ -156,7 +153,7 @@ class RadarPointcloudProjector():
         t1 = time.time()
         pointcloud = np.zeros((numpoints, 5))
 
-        frame_h,frame_w,_ = output_frame_shape
+        frame_h, frame_w, channels = output_frame_shape
         norm_scales = np.asarray([frame_w / self.camera_info['width_pix'], frame_w / self.camera_info['height_pix']])
 
         pix_min = np.asarray([0,0])
@@ -177,14 +174,14 @@ class RadarPointcloudProjector():
                 x_oob = (projected_points[:,0] < 0) |  (projected_points[:,0] >= frame_w)
                 y_oob = (projected_points[:,1] < 0) | (projected_points[:,1] >= frame_w)
 
-                good_points = ~(x_oob | y_oob) #NOR; unfortunately no single-op for this
+                good_points = ~(x_oob | y_oob) #NOR; unfortunately no single-op for thisin python
             else:
                 projected_points = np.clip(projected_points, a_min=pix_min, a_max=pix_max)
         
             pointcloud[:,0:2] = projected_points
-            pointcloud[:,2] = all_pointclouds[:,2]
-            pointcloud[:,3] = distances
-            pointcloud[:,4] = doppler
+            pointcloud[:,2] = all_pointclouds[:,2] # Z distance
+            pointcloud[:,3] = distances # radial distance
+            pointcloud[:,4] = doppler # positive is moving away from the radar. In meters/sec
 
             # print('first 3 postprocessed points')
             # print(pointcloud[0:3,:]) #print a few points
@@ -195,7 +192,7 @@ class RadarPointcloudProjector():
             t2 = time.time()
         return pointcloud
 
-    def distort_pointcloud_projections(self, projected_points, k_coeff=radar_const.IMX219_LENS_RADIAL_DISTORTION, p_coeff=radar_const.IMX219_LENS_TANGENTIAL_DISTORTION, s_coeff=radar_const.IMX219_LENS_THIN_PRISM_DISTORTION, fudge_factors=[radar_const.IMX219_DEMO_FUDGE_FACTOR_X, radar_const.IMX219_DEMO_FUDGE_FACTOR_Y]) : 
+    def distort_pointcloud_projections(self, projected_points, k_coeff=camera_constants.IMX219_LENS_RADIAL_DISTORTION, p_coeff=camera_constants.IMX219_LENS_TANGENTIAL_DISTORTION, s_coeff=camera_constants.IMX219_LENS_THIN_PRISM_DISTORTION, fudge_factors=[camera_constants.IMX219_DEMO_FUDGE_FACTOR_X, camera_constants.IMX219_DEMO_FUDGE_FACTOR_Y]) : 
         '''
         https://learnopencv.com/understanding-lens-distortion/
         '''
@@ -232,7 +229,7 @@ class RadarPointcloudProjector():
 
     def draw_pointcloud_baseline(self, frame, pointcloud):
         '''
-        starter function; use as a basis point
+        starter function for visualizing points on frame; use as a basis point
         '''
         
         background_circle_color = (255, 255, 255)
@@ -242,6 +239,7 @@ class RadarPointcloudProjector():
             size = 10/pc[2]
             size = int(max(min(size,15),2))
 
+            # good to use two circles with high contrast to show more easily on all backgrounds
             cv2.circle(frame, (int(pc[0]), int(pc[1])), size, background_circle_color, -1)
             cv2.circle(frame, (int(pc[0]), int(pc[1])), size-1, offset_circle_color, -1)
 
@@ -265,8 +263,6 @@ class RadarPointcloudProjector():
         world_points[:,2] *= -1 #invert z in world coordinates to end up right-hand-rule compliant coordinate system
 
         world_points = np.append(world_points, np.ones( (world_points.shape[0],1) ), axis=1) #add ones so translation portion of extrinsic is applied
-        # print('converted world points to RHR system')
-        # print(world_points)
 
 
         camera_coord_points = np.matmul(world_points, self.extrinsic_matrix)

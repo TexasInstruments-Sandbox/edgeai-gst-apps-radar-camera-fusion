@@ -37,7 +37,8 @@ from post_process import PostProcess
 from pointcloud_projection import RadarPointcloudProjector
 
 from collections import deque
-import radar.constants as radar_const
+import radar.radar_constants as radar_const
+import camera_constants
 import queue
 
 class InferPipe:
@@ -83,11 +84,11 @@ class InferPipe:
         if pointcloud_queue is not None:
             self.use_radar = True
             self.pointcloud_queue = pointcloud_queue
-            self.pointcloud_frames = deque(maxlen=radar_const.PERSISTENCE_FRAMES) 
+            self.pointcloud_frames = deque(maxlen=camera_constants.PERSISTENCE_FRAMES) 
 
             #cam_offset_dist = [0,  -0.025, -0.01] #default guess -- RG
-            cam_offset_dist = [radar_const.IMX219_DEMO_OFFSET_X,  radar_const.IMX219_DEMO_OFFSET_Y, radar_const.IMX219_DEMO_OFFSET_Z] #default guess -- RG
-            cam_offset_angles = [radar_const.IMX219_DEMO_ANGLE_RADIANS_PITCH,radar_const.IMX219_DEMO_ANGLE_RADIANS_YAW, radar_const.IMX219_DEMO_ANGLE_RADIANS_ROLL] # pitch, yaw, roll
+            cam_offset_dist = [camera_constants.IMX219_DEMO_OFFSET_X,  camera_constants.IMX219_DEMO_OFFSET_Y, camera_constants.IMX219_DEMO_OFFSET_Z] #default guess -- RG
+            cam_offset_angles = [camera_constants.IMX219_DEMO_ANGLE_RADIANS_PITCH,camera_constants.IMX219_DEMO_ANGLE_RADIANS_YAW, camera_constants.IMX219_DEMO_ANGLE_RADIANS_ROLL] # pitch, yaw, roll
             cam_offset_dist.extend(cam_offset_angles)
             
             self.pointcloud_processor = RadarPointcloudProjector(sensor='imx219_1640x1232', cam_to_radar_offset=cam_offset_dist, mirror=self.mirror_pointcloud)
@@ -136,7 +137,7 @@ class InferPipe:
                     pointcloud = self.pointcloud_queue.get_nowait()
                     #swap y and z; z should be distance and y height for standard camera model
                     pointcloud[:,[1,2]] = pointcloud[:, [2,1]]
-                    if len(self.pointcloud_frames) == radar_const.PERSISTENCE_FRAMES:
+                    if len(self.pointcloud_frames) == camera_constants.PERSISTENCE_FRAMES:
                         self.pointcloud_frames.popleft()
                     
                     self.pointcloud_frames.append(pointcloud)
