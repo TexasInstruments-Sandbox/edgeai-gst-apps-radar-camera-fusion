@@ -79,10 +79,29 @@ Internal (to the camera) calibration will consider the physical relationship bet
 Internal calibration uses the intrinsic matrix to transform the point from a physical location in meters into a X,Y location in pixels. 
 * Note that common softwares for image processing like OpenCV consider the Y pixel value to increase in the downward direction. 
 
+Tools like OpenCV have built-in functions for creating an intrinsic matrix from a series of checkerboard images. See the [tutorial from OpenCV](https://docs.opencv.org/4.x/dc/dbb/tutorial_py_calibration.html). This can be used to produce a camera (aka intrinsic) matrix 
+
+Alternatively, a decent intrinsic matrix can be acquired by knowing the physical pixel size (typically in microns), the resolution being captured, and the focal length of the lens. 
+
 #### Lens Distortion
-Unless there is substantial distortion on the lens (e.g. wide angle / fisheye), This is probably minimal. Should be using LDC for highly distorted lens to un-distort. There may still be some distortion, and we need to re-map projected points to match the level of distortion present in the image. 
+Unless there is substantial distortion on the lens (e.g. wide angle / fisheye), This is probably minimal. Devices like AM62A make use hardware acceleration (Lens Distortion Correction (LDC) within the ISP) for highly distorted lens. There may still be some distortion, and we may need to re-map projected points to match the level of distortion present in the image. 
+
+If distortion is still present (and non trivial to remove), we may need to (effectively) re-distort the 3D points projected onto the camera plane. See the [pointcloud_projection.py](../apps_python/pointcloud_projection.py), which has a structure for implementing this distortion according to OpenCV's mathmatical representation of distortion sources. This function is parameterized by values within [camera_constants.py](../apps_python/camera_constants.py).
 
 ### Tuning Calibration
 
+For this demo, tuning was handled manually by modifying translational and rotational parameters in [camera_constants.py](../apps_python/camera_constants.py), and gradually tuning until the results were sufficiently accurate from a visual test. 
+
+To do this, it is helpful to have a consistent reflector, like a corner reflector. If this is pointed at the radar, it will reflect in the same direction  such that multiple strong points will be recognized. The visualized (i.e. projected) points should intersect/cover this reflector in the output images. 
+
+![corner reflector, source: Wikipedia](https://en.wikipedia.org/wiki/File:Corner_reflector.JPG)
+
+To more calibrate and build the extrinsics using data, a common strategy is to place put a checkerboard image onto a cardboard box (non-reflective for radar) with a corner reflector attached to the back to create a calibration apparatus. 
+* Multiple frames (10-20) are captured with the calibration apparatus at different locations, ideally on the same horizontal plane as the radar (i.e., move the setup laterally) because elevational (vertical) resolution of imaging radar is generally less precise than the azimuthal (horizontal) resolution. 
+    * When capturing a data point (an image + radar pointcloud), ensure the image and pointcloud are captured at the same time (or at least with no movement during that time period)
+    * Multiple 3D points may be captured -- the strongest SNR should correspond to the corner reflector
+* Run a sum-of-least-squares algorithm to set the parameters of the extrinsics matrix that map 3D points to the center of the checkerboard, which OpenCV can easily isolate from a clear image.  
+
 ## Distance Estimates
 
+FIXME
