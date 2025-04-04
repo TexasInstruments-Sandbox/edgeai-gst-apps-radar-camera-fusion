@@ -168,7 +168,7 @@ class InferPipe:
                 t1 = time()
                 pointcloud = self.pointcloud_processor(list(self.pointcloud_frames), out_frame.shape)
 
-                out_frame = self.post_proc(frame, result, pointcloud, self.track_distance)
+                out_frame = self.post_proc(frame, result, pointcloud)
 
                 # out_frame  = self.pointcloud_processor.draw_pointcloud_baseline(out_frame, pointcloud)
                 t2 = time()

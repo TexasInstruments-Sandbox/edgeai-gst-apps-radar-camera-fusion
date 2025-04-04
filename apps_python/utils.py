@@ -94,6 +94,11 @@ def get_cmdline_args(sysv_args):
         "-r", "--radar", help=help_str_radar, action="store_true", default=False
     )
 
+    help_str_cal = 'Enable radar calibration mode, which disables people tracking and distance measurements and shows all projected points'
+    parser.add_argument(
+        "-c", "--calibrate-radar", help=help_str_cal, action="store_true", default=False
+    )
+
     args = parser.parse_args()
     return args
 

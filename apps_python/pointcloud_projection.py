@@ -73,12 +73,12 @@ class RadarPointcloudProjector():
 
         if intrinsics_matrix is None:
 
-            focal_len_pix_width = self.camera_info['cam_focal_length_mm'] / (self.camera_info['pix_width_um'] / 1000 )
-            focal_len_pix_height = self.camera_info['cam_focal_length_mm'] / (self.camera_info['pix_height_um'] / 1000 )
+            focal_len_pix_width = self.camera_info['cam_focal_length_mm'] / ( self.camera_info['pix_width_um'] / 1000 )
+            focal_len_pix_height = self.camera_info['cam_focal_length_mm'] / ( self.camera_info['pix_height_um'] / 1000 )
             center_x = self.camera_info['width_pix'] / 2 #this is a best guess! intrinsic calibration with opencv is recommended
             center_y = self.camera_info['height_pix'] / 2
 
-            #This will be transpose of canonical matrix format to make later calculations a bit easier
+            #This will be transpose of canonical matrix format to do later calculations on row-wise 3D points
             self.intrinsic_matrix = np.asarray(([focal_len_pix_width, 0, center_x],[0, focal_len_pix_height, center_y],[0, 0, 1])).T
 
         else:
@@ -139,6 +139,7 @@ class RadarPointcloudProjector():
         rotation = np.matmul(rotation_yaw, np.matmul(rotation_pitch, rotation_roll))
 
         self.extrinsic_matrix = np.append(rotation, translation, axis=0)
+        print("extrinsics:")
         print(self.extrinsic_matrix) #should be 4,3q
         return self.extrinsic_matrix
 
@@ -154,7 +155,7 @@ class RadarPointcloudProjector():
         pointcloud = np.zeros((numpoints, 5))
 
         frame_h, frame_w, channels = output_frame_shape
-        norm_scales = np.asarray([frame_w / self.camera_info['width_pix'], frame_w / self.camera_info['height_pix']])
+        norm_scales = np.asarray([frame_w / self.camera_info['width_pix'], frame_h / self.camera_info['height_pix']])
 
         pix_min = np.asarray([0,0])
         pix_max = np.asarray([frame_w, frame_h])
@@ -228,7 +229,7 @@ class RadarPointcloudProjector():
         return distorted_points 
 
 
-    def draw_pointcloud_baseline(self, frame, pointcloud):
+    def draw_pointcloud_baseline(frame, pointcloud):
         '''
         starter function for visualizing points on frame; use as a basis point
         '''
@@ -248,7 +249,7 @@ class RadarPointcloudProjector():
         return frame 
 
 
-    def project_points_from_radar_to_camera_2d(self, pointcloud, normalization_scales=[1,1]):
+    def project_points_from_radar_to_camera_2d(self, pointcloud, normalization_scales=[1,1], print_intermediate=False):
         '''
         https://docs.opencv.org/3.4/d9/d0c/group__calib3d.html
         Unlike CV doc above, we'll be representing points as rows to work better with structure of pointcloud input
@@ -261,18 +262,32 @@ class RadarPointcloudProjector():
         world_points = pointcloud[:,:3] #N,3 <- N,7 datastructure
         world_points[:,1] *= -1 #invert y in world coordinates to end up right-hand-rule compliant coordinate system. 
         # Will also orient Y such that down is increasing in value, consistent with display convention (UPPER left is origin (0,0))
+        if print_intermediate:
+            print('world points, inversion')
+            print(world_points)
+
 
         world_points = np.append(world_points, np.ones( (world_points.shape[0],1) ), axis=1) #add ones so translation portion of extrinsic is applied
 
-
+        #points no 3D in phsyical units (meters), but from camera's coordinate reference
         camera_coord_points = np.matmul(world_points, self.extrinsic_matrix)
+
+        if print_intermediate:
+            print('cam coord points, post inversion')
+            print(camera_coord_points)
 
         normalized_points = np.divide(camera_coord_points[:,0:2], camera_coord_points[:,2][:,np.newaxis]) # normalize by psuedo distance scale 's'
 
+        if print_intermediate:
+            print('normalized points')
+            print(normalized_points)
         #distortion
         distorted_points = np.ones(camera_coord_points.shape)
         distorted_points[:,0:2] = self.distort_pointcloud_projections(normalized_points)
 
+        if print_intermediate:
+            print('distorted_points ')
+            print(distorted_points)
 
         projected_points = np.matmul(distorted_points, self.intrinsic_matrix)
         projected_points = projected_points[:,:2]
@@ -280,5 +295,61 @@ class RadarPointcloudProjector():
         #normalize to the frame we'll be visualizing
         projected_points *= normalization_scales
 
-
         return projected_points
+
+
+
+def draw_pointcloud_baseline(frame, pointcloud):
+    '''
+    starter function for visualizing points on frame; use as a basis point
+    '''
+    
+    background_circle_color = (255, 255, 255)
+    offset_circle_color = (0, 0, 0)
+
+    for pc in pointcloud:
+        size = 10/pc[2]
+        size = int(max(min(size,15),2))
+
+        # good to use two circles with high contrast to show more easily on all backgrounds
+        cv2.circle(frame, (int(pc[0]), int(pc[1])), size, background_circle_color, -1)
+        cv2.circle(frame, (int(pc[0]), int(pc[1])), size-1, offset_circle_color, -1)
+
+
+    return frame 
+
+def test_pointcloud_points_for_standard_HW_setup():
+    '''
+    Assumes the hardware setup guide was followed with IMX219 and IWR6843 mounted to a 3d printed holder inlcuded in this repo as STL
+    '''
+    frame_w_test, frame_h_test = 1280, 720
+    cam_info_w_test, cam_info_h_test = 1640, 1232
+    norm_scales_test = np.asarray([frame_w_test / cam_info_w_test, frame_h_test / cam_info_h_test])
+    print(norm_scales_test)
+    #X,Y,Z points in meters. Z must be positive
+    test_pointcloud_points = np.asarray([
+        [0, 0, 1],
+        [1, 0, 1],
+        [0, 1, 1],
+        [1, 1, 1],
+        [-1, -1, 1],
+        [-1.5, -1.5, 1],
+        [-0.5, -0.5, 1],        
+        [1.5, 1.5, 1],
+        [0.5, 0.5, 1],
+    ] )   
+
+    print('input points: ')
+    print(test_pointcloud_points)
+
+    cam_offset_dist = [camera_constants.IMX219_DEMO_OFFSET_X,  camera_constants.IMX219_DEMO_OFFSET_Y, camera_constants.IMX219_DEMO_OFFSET_Z] 
+    pointcloud_processor = RadarPointcloudProjector(sensor='imx219_1640x1232', cam_to_radar_offset=cam_offset_dist, mirror=True)
+
+    projected_points = pointcloud_processor.project_points_from_radar_to_camera_2d(test_pointcloud_points, norm_scales_test, True)
+
+    print('projected_points')
+    print(projected_points)
+
+
+if __name__ == '__main__':
+    test_pointcloud_points_for_standard_HW_setup()
