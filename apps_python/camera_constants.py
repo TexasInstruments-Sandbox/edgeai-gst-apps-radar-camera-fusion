@@ -31,7 +31,7 @@
 
 import math
 
-PERSISTENCE_FRAMES = 1
+PERSISTENCE_FRAMES = 2
 
 #extrinsic calibration values. Think of these are moving from the Radar POV into camera POV. X points to the right, Y points up, and Z points back INTO the radar/camera (Z must be this way to allow right-hand-rule relationships)
 #distances in meters
@@ -63,7 +63,7 @@ IMX219_DEMO_LENS_DISTORTION_S3 = 0   #thin prism, Y, 2nd order
 IMX219_DEMO_LENS_DISTORTION_S4 = 0   #thin prism, Y, 4th order
 
 IMX219_DEMO_FUDGE_FACTOR_X = 0 #nonconventional X fixes; intentionally not radial
-IMX219_DEMO_FUDGE_FACTOR_Y = 0#-0.3 #nonconventional X fixes; intentionally not radial to resolve non-radial error
+IMX219_DEMO_FUDGE_FACTOR_Y = 0 #nonconventional X fixes; intentionally not radial to resolve non-radial error
 
 
 
