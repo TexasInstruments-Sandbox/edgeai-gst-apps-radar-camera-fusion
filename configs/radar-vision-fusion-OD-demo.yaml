@@ -14,7 +14,7 @@ inputs:
         height: 1232
         format: rggb10
         framerate: 30
-        mirror: lr #Added option to mirror images left-right
+        #mirror: lr #Added option to mirror images left-right. This will increase latency!
     input2:
         source: /dev/video-imx219-cam0
         subdev-id: /dev/v4l-imx219-subdev0

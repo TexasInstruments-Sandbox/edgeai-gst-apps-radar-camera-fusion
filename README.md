@@ -7,9 +7,10 @@ The system is composed of the [AM62A74](https://www.ti.com/product/AM62A7)vision
 #### TOC
 
 1) [Demo explanation](#demo-explanation--video)
-2) [Reproducing the application](#reproducing-the-application)
+2) [Running the demo](#running-the-demo)
   2.1) [Hardware setup](#hardware-build)
   2.2) [Software setup](#software-setup)
+  2.3) [Start the Demo](#start-the-demo)
 
 ## Demo Explanation + video
 
@@ -19,7 +20,7 @@ The system is composed of the [AM62A74](https://www.ti.com/product/AM62A7)vision
 
 For more detailed explanation, please see the [Detailed Demo Explanation](./docs/detailed-demo-explanation.md) doc for how the demo works.
 
-## Reproducing the application
+## Running the demo
 
 ### Hardware build
 
@@ -75,7 +76,7 @@ Connect cables:
    * This only needs to be done once for a new SD card installation
 
 
-###### Run the demo
+###### Start the demo
 
 Execute the script "[run_radar_vision_fusion_demo.sh](./run_radar_vision_fusion_demo.sh)"
 
@@ -85,3 +86,10 @@ chmod +x ./run_radar_vision_fusion_demo.sh
 ```
 
 A systemd script is also useful for auto-starting this application upon boot. If so, make sure to call the [init_script.sh](./init_script.sh) before the actual demo runner script.
+
+Alternatively, the demo can be run with the command: 
+```
+python3 apps_python/app_edgeai.py  ./configs/radar-vision-fusion-OD-demo_with_overlay.yaml  -n  -r
+```
+See the YAML config file to see how the input source is selected. IMX219 in 1640x1232 resolution is assumed. 
+* Please also note that the input will look mirrored (moving left in real world --> move right on the screen), unless the input configuration "mirror: lr" is included. However, this will increase latency 
